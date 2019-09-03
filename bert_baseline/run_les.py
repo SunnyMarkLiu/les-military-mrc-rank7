@@ -48,7 +48,7 @@ from utils_les import (read_squad_examples, convert_examples_to_features,
 # The follwing import is the official SQuAD evaluation script (2.0).
 # You can remove it from the dependencies if you are using this script outside of the library
 # We've added it here for automated tests (see examples/test_examples.py file)
-from utils_les_evaluate import EVAL_OPTS, main as evaluate_on_squad
+from utils_les_evaluate import evaluate_on_les
 
 logger = logging.getLogger(__name__)
 
@@ -162,14 +162,18 @@ def train(args, train_dataset, model, tokenizer):
                 model.zero_grad()
                 global_step += 1
 
+                if args.local_rank == -1 and args.evaluate_during_training and (
+                   args.eval_steps > 0 and global_step % args.eval_steps == 0):  # Only evaluate when single GPU otherwise metrics may not average well
+                    results = evaluate(args, model, tokenizer)
+                    logger.info('eval at {} global steps: {}'.format(global_step, results))
+                    for key, value in results.items():
+                        tb_writer.add_scalar('eval_{}'.format(key), value, global_step)
+
                 if args.local_rank in [-1, 0] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
                     # Log metrics
-                    if args.local_rank == -1 and args.evaluate_during_training:  # Only evaluate when single GPU otherwise metrics may not average well
-                        results = evaluate(args, model, tokenizer)
-                        for key, value in results.items():
-                            tb_writer.add_scalar('eval_{}'.format(key), value, global_step)
                     tb_writer.add_scalar('lr', scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar('loss', (tr_loss - logging_loss)/args.logging_steps, global_step)
+                    logger.info('at {} global steps, loss is {}'.format(global_step, (tr_loss - logging_loss)/args.logging_steps))
                     logging_loss = tr_loss
 
                 if args.local_rank in [-1, 0] and args.save_steps > 0 and global_step % args.save_steps == 0:
@@ -258,16 +262,17 @@ def evaluate(args, model, tokenizer, prefix=""):
                         model.config.start_n_top, model.config.end_n_top,
                         args.version_2_with_negative, tokenizer, args.verbose_logging)
     else:
-        write_predictions(examples, features, all_results, args.n_best_size,
-                        args.max_answer_length, args.do_lower_case, output_prediction_file,
-                        output_nbest_file, output_null_log_odds_file, args.verbose_logging,
-                        args.version_2_with_negative, args.null_score_diff_threshold)
+        all_predictions = write_predictions(examples, features, all_results, args.n_best_size,
+                            args.max_answer_length, args.do_lower_case, output_prediction_file,
+                            output_nbest_file, output_null_log_odds_file, args.verbose_logging,
+                            args.version_2_with_negative, args.null_score_diff_threshold)
 
-    # Evaluate with the official SQuAD script
-    evaluate_options = EVAL_OPTS(data_file=args.predict_file,
-                                 pred_file=output_prediction_file,
-                                 na_prob_file=output_null_log_odds_file)
-    results = evaluate_on_squad(evaluate_options)
+    # # Evaluate with the official SQuAD script
+    # evaluate_options = EVAL_OPTS(data_file=args.predict_file,
+    #                              pred_file=output_prediction_file,
+    #                              na_prob_file=output_null_log_odds_file)
+    # results = evaluate_on_squad(evaluate_options)
+    results = evaluate_on_les(all_predictions, args.predict_file)
     return results
 
 
@@ -402,6 +407,8 @@ def main():
                         help="Log every X updates steps.")
     parser.add_argument('--save_steps', type=int, default=50,
                         help="Save checkpoint every X updates steps.")
+    parser.add_argument('--eval_steps', type=int, default=1000,
+                        help="Eval on predict file every X updates steps.")
     parser.add_argument("--eval_all_checkpoints", action='store_true',
                         help="Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number")
     parser.add_argument("--no_cuda", action='store_true',
