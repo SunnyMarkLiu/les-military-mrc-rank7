@@ -608,22 +608,25 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1)]
+                # tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1)]
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
                 orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end + 1)]
-                tok_text = " ".join(tok_tokens)
+                # tok_text = " ".join(tok_tokens)
 
                 # De-tokenize WordPieces that have been split off.
-                tok_text = tok_text.replace(" ##", "")
-                tok_text = tok_text.replace("##", "")
+                # tok_text = tok_text.replace(" ##", "")
+                # tok_text = tok_text.replace("##", "")
 
-                # Clean whitespace
-                tok_text = tok_text.strip()
-                tok_text = " ".join(tok_text.split())
-                orig_text = " ".join(orig_tokens)
+                # TODO Clean whitespace, 这里空格暂时不处理
+                # tok_text = tok_text.strip()
+                # tok_text = " ".join(tok_text.split())
+                # orig_text = " ".join(orig_tokens)
+                orig_text = "".join(orig_tokens)
 
-                final_text = get_final_text(tok_text, orig_text, do_lower_case, verbose_logging)
+                # TODO 暂时不用get_final_text
+                # final_text = get_final_text(tok_text, orig_text, do_lower_case, verbose_logging)
+                final_text = orig_text
                 if final_text in seen_predictions:
                     continue
 
@@ -637,26 +640,26 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                     text=final_text,
                     start_logit=pred.start_logit,
                     end_logit=pred.end_logit))
-        # if we didn't include the empty option in the n-best, include it
-        if version_2_with_negative:
-            if "" not in seen_predictions:
-                nbest.append(
-                    _NbestPrediction(
-                        text="",
-                        start_logit=null_start_logit,
-                        end_logit=null_end_logit))
-
-            # In very rare edge cases we could only have single null prediction.
-            # So we just create a nonce prediction in this case to avoid failure.
-            if len(nbest)==1:
-                nbest.insert(0,
-                    _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
-
-        # In very rare edge cases we could have no valid predictions. So we
-        # just create a nonce prediction in this case to avoid failure.
-        if not nbest:
-            nbest.append(
-                _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+        # # if we didn't include the empty option in the n-best, include it
+        # if version_2_with_negative:
+        #     if "" not in seen_predictions:
+        #         nbest.append(
+        #             _NbestPrediction(
+        #                 text="",
+        #                 start_logit=null_start_logit,
+        #                 end_logit=null_end_logit))
+        #
+        #     # In very rare edge cases we could only have single null prediction.
+        #     # So we just create a nonce prediction in this case to avoid failure.
+        #     if len(nbest)==1:
+        #         nbest.insert(0,
+        #             _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+        #
+        # # In very rare edge cases we could have no valid predictions. So we
+        # # just create a nonce prediction in this case to avoid failure.
+        # if not nbest:
+        #     nbest.append(
+        #         _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         assert len(nbest) >= 1
 
@@ -689,20 +692,35 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                 best_non_null_entry.end_logit)
             scores_diff_json[example.qas_id] = score_diff
             if score_diff > null_score_diff_threshold:
-                all_predictions[example.qas_id] = ""
+                # all_predictions[example.qas_id] = ""
+                # TODO 先始终取example中最大的非空答案
+                non_null_prob = best_non_null_entry.start_logit + best_non_null_entry.end_logit
+                all_predictions[example.qas_id] = [best_non_null_entry.text, non_null_prob]
             else:
-                all_predictions[example.qas_id] = best_non_null_entry.text
+                # all_predictions[example.qas_id] = best_non_null_entry.text
+                non_null_prob = best_non_null_entry.start_logit + best_non_null_entry.end_logit
+                all_predictions[example.qas_id] = [best_non_null_entry.text, non_null_prob]
+
         all_nbest_json[example.qas_id] = nbest_json
 
+    # 将多个example合成一个sample
+    all_samples = collections.defaultdict(list)
+    for qas_id, prediction in all_predictions.items():
+        all_samples[qas_id.split('##')[0]].append(prediction)
+    all_predictions = {}
+    for question_id, sample in all_samples.items():
+        sample = sorted(sample, key=lambda x: x[1], reverse=True)
+        all_predictions[question_id] = sample[0][0]
+
     with open(output_prediction_file, "w") as writer:
-        writer.write(json.dumps(all_predictions, indent=4) + "\n")
+        writer.write(json.dumps(all_predictions, indent=4, ensure_ascii=False) + "\n")
 
     with open(output_nbest_file, "w") as writer:
-        writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
+        writer.write(json.dumps(all_nbest_json, indent=4, ensure_ascii=False) + "\n")
 
     if version_2_with_negative:
         with open(output_null_log_odds_file, "w") as writer:
-            writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
+            writer.write(json.dumps(scores_diff_json, indent=4, ensure_ascii=False) + "\n")
 
     return all_predictions
 
