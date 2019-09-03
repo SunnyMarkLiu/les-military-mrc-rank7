@@ -3,7 +3,7 @@ set -ex
 DATA_DIR="/home/len/yingzq/dureader"
 MODEL_DIR="/home/len/yingzq/pretrained-models/chinese_L-12_H-768_A-12"
 
-python run_dureader.py \
+python run_les.py \
     --model_type bert \
     --model_name_or_path $MODEL_DIR/pytorch_model.bin \
     --config_name $MODEL_DIR/bert_config.json \
@@ -12,8 +12,8 @@ python run_dureader.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file $DATA_DIR/bert.train.part.json \
-    --predict_file $DATA_DIR/bert.dev.json \
+    --train_file $DATA_DIR/bert.tiny.json \
+    --predict_file $DATA_DIR/bert.tiny.json \
     --output_dir models/bert_finetuned_dureader_test/ \
     --version_2_with_negative \
     --max_seq_length 512 \

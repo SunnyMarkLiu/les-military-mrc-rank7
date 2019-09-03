@@ -14,7 +14,7 @@ import os
 import re
 import string
 import sys
-from metric import normalize, compute_bleu_rouge
+from eval_metric import normalize, compute_bleu_rouge
 
 
 # 莱斯杯评测函数

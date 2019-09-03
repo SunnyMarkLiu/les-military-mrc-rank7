@@ -2,9 +2,9 @@
 set -ex
 DATA_DIR="/home/len/yingzq/dureader"
 MODEL_DIR="/home/len/yingzq/pretrained-models/chinese_L-12_H-768_A-12"
-RELOAD_MODEL_DIR="models/bert_finetuned_dureader/checkpoint-1200"
+RELOAD_MODEL_DIR="models/bert_finetuned_dureader_test"
 
-python run_dureader.py \
+python run_les.py \
     --model_type bert \
     --model_name_or_path $RELOAD_MODEL_DIR/pytorch_model.bin \
     --config_name $MODEL_DIR/bert_config.json \
@@ -16,7 +16,7 @@ python run_dureader.py \
     --output_dir $RELOAD_MODEL_DIR \
     --version_2_with_negative \
     --max_seq_length 512 \
-    --max_answer_length 350 \
+    --max_answer_length 110 \
     --per_gpu_eval_batch_size 18 \
     --doc_stride 128 \
     --logging_steps 10 \
