@@ -27,7 +27,7 @@ from io import open
 from pytorch_transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
 
 # Required by XLNet evaluation method to compute optimal threshold (see write_predictions_extended() method)
-from utils_squad_evaluate import find_all_best_thresh_v2, make_qid_to_has_ans, get_raw_scores
+from utils_les_evaluate import find_all_best_thresh_v2, make_qid_to_has_ans, get_raw_scores
 
 logger = logging.getLogger(__name__)
 
@@ -110,8 +110,8 @@ class InputFeatures(object):
 
 def read_squad_examples(input_file, is_training, version_2_with_negative):
     """Read a SQuAD json file into a list of SquadExample."""
-    with open(input_file, "r", encoding='utf-8') as reader:
-        input_data = json.load(reader)["data"]
+    # with open(input_file, "r", encoding='utf-8') as reader:
+    #     input_data = json.load(reader)["data"]
 
     def is_whitespace(c):
         if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
@@ -119,70 +119,93 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
         return False
 
     examples = []
-    for entry in input_data:
-        for paragraph in entry["paragraphs"]:
-            paragraph_text = paragraph["context"]
-            doc_tokens = []
-            char_to_word_offset = []
-            prev_is_whitespace = True
-            for c in paragraph_text:
-                if is_whitespace(c):
-                    prev_is_whitespace = True
-                else:
-                    if prev_is_whitespace:
-                        doc_tokens.append(c)
-                    else:
-                        doc_tokens[-1] += c
-                    prev_is_whitespace = False
-                char_to_word_offset.append(len(doc_tokens) - 1)
+    with open(input_file) as fin:
+        log_steps = 3000  # log打印间隔
+        for line_id, line in enumerate(fin):
+            line = line.strip()
 
-            for qa in paragraph["qas"]:
-                qas_id = qa["id"]
-                question_text = qa["question"]
-                start_position = None
-                end_position = None
-                orig_answer_text = None
-                is_impossible = False
-                if is_training:
-                    if version_2_with_negative:
-                        is_impossible = qa["is_impossible"]
-                    if (len(qa["answers"]) != 1) and (not is_impossible):
-                        raise ValueError(
-                            "For training, each question should have exactly 1 answer.")
-                    if not is_impossible:
-                        answer = qa["answers"][0]
-                        orig_answer_text = answer["text"]
-                        answer_offset = answer["answer_start"]
-                        answer_length = len(orig_answer_text)
-                        start_position = char_to_word_offset[answer_offset]
-                        end_position = char_to_word_offset[answer_offset + answer_length - 1]
-                        # Only add answers where the text can be exactly recovered from the
-                        # document. If this CAN'T happen it's likely due to weird Unicode
-                        # stuff so we will just skip the example.
-                        #
-                        # Note that this means for training mode, every example is NOT
-                        # guaranteed to be preserved.
-                        actual_text = " ".join(doc_tokens[start_position:(end_position + 1)])
-                        cleaned_answer_text = " ".join(
-                            whitespace_tokenize(orig_answer_text))
-                        if actual_text.find(cleaned_answer_text) == -1:
-                            logger.warning("Could not find answer: '%s' vs. '%s'",
-                                           actual_text, cleaned_answer_text)
-                            continue
+            if log_steps > 0 and (line_id + 1) % log_steps == 0:
+                logger.info('We have read {} lines through les-json-data'.format(line_id + 1))
+            if not line:
+                logger.warning('There is an empty line in les-json-data, line_id={}'.format(line_id + 1))
+                continue
+
+            sample = json.loads(line)
+            question_text = sample['question']
+            context_num = len(sample['documents'])
+            context_list = [doc['passage'] for doc in sample['documents']]
+
+            if is_training:
+                match_doc_ids = sample['best_match_doc_ids']
+
+                for doc_id in range(context_num):  # doc_id代表进行到一个例子中的第几个documents了
+                    doc_tokens = []
+                    char_to_word_offset = []
+                    # TODO 暂时word与char一一对应, 后续可能不同
+                    doc_tokens = list(context_list[doc_id])
+                    char_to_word_offset = list(range(len(doc_tokens)))
+
+                    if doc_id in match_doc_ids:  # 该document有答案
+                        count = 0  # 代表同一个document有多少个答案
+                        for match_id, (start, end) in zip(match_doc_ids, sample['answer_labels']):
+                            if doc_id != match_id: continue
+                            count += 1
+                            qas_id = '{}##{}##{}'.format(sample['question_id'], doc_id, count)
+                            start_position = start
+                            end_position = end
+                            orig_answer_text = doc_tokens[start:end + 1]
+                            is_impossible = False
+
+                            example = SquadExample(
+                                qas_id=qas_id,
+                                question_text=question_text,
+                                doc_tokens=doc_tokens,
+                                orig_answer_text=orig_answer_text,
+                                start_position=start_position,
+                                end_position=end_position,
+                                is_impossible=is_impossible)
+                            examples.append(example)
                     else:
+                        # 训练集中没有答案的document
+                        qas_id = '{}##{}##0'.format(sample['question_id'], doc_id)
                         start_position = -1
                         end_position = -1
                         orig_answer_text = ""
+                        is_impossible = True
 
-                example = SquadExample(
-                    qas_id=qas_id,
-                    question_text=question_text,
-                    doc_tokens=doc_tokens,
-                    orig_answer_text=orig_answer_text,
-                    start_position=start_position,
-                    end_position=end_position,
-                    is_impossible=is_impossible)
-                examples.append(example)
+                        example = SquadExample(
+                            qas_id=qas_id,
+                            question_text=question_text,
+                            doc_tokens=doc_tokens,
+                            orig_answer_text=orig_answer_text,
+                            start_position=start_position,
+                            end_position=end_position,
+                            is_impossible=is_impossible)
+                        examples.append(example)
+            else:
+                # not training
+                for doc_id in range(context_num):
+                    doc_tokens = []
+                    char_to_word_offset = []
+                    # TODO 暂时word与char一一对应, 后续可能不同
+                    doc_tokens = list(context_list[doc_id])
+                    char_to_word_offset = list(range(len(doc_tokens)))
+
+                    qas_id = '{}##{}--0'.format(sample['question_id'], doc_id)
+                    start_position = None
+                    end_position = None
+                    orig_answer_text = ""
+                    is_impossible = False
+
+                    example = SquadExample(
+                        qas_id=qas_id,
+                        question_text=question_text,
+                        doc_tokens=doc_tokens,
+                        orig_answer_text=orig_answer_text,
+                        start_position=start_position,
+                        end_position=end_position,
+                        is_impossible=is_impossible)
+                    examples.append(example)
     return examples
 
 
@@ -201,11 +224,17 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     # f = np.zeros((max_N, max_M), dtype=np.float32)
 
     features = []
+    unk_tokens_dict = collections.defaultdict(int)  # 记录vocab中找不到的token
+    skipped_tokens_dict = collections.defaultdict(int)  # 记录tokenize后被删掉的token
+    log_steps = 2000  # log打印间隔
     for (example_index, example) in enumerate(examples):
+        if log_steps > 0 and (example_index + 1) % log_steps == 0:
+            logger.info('we have converted {} examples to features'.format(example_index + 1))
 
         # if example_index % 100 == 0:
         #     logger.info('Converting %s/%s pos %s neg %s', example_index, len(examples), cnt_pos, cnt_neg)
 
+        # TODO 这样似乎question中的英文没分开,也许会有问题
         query_tokens = tokenizer.tokenize(example.question_text)
 
         if len(query_tokens) > max_query_length:
@@ -216,7 +245,15 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
         all_doc_tokens = []
         for (i, token) in enumerate(example.doc_tokens):
             orig_to_tok_index.append(len(all_doc_tokens))
-            sub_tokens = tokenizer.tokenize(token)
+            # TODO 这里将空格单独处理了
+            if token == ' ':
+                sub_tokens = ['[unused1]']
+            else:
+                sub_tokens = tokenizer.tokenize(token)
+                if '[UNK]' in sub_tokens:
+                    unk_tokens_dict[token] += 1
+                if len(sub_tokens) == 0:
+                    skipped_tokens_dict[token] += 1
             for sub_token in sub_tokens:
                 tok_to_orig_index.append(i)
                 all_doc_tokens.append(sub_token)
@@ -232,9 +269,10 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 tok_end_position = orig_to_tok_index[example.end_position + 1] - 1
             else:
                 tok_end_position = len(all_doc_tokens) - 1
-            (tok_start_position, tok_end_position) = _improve_answer_span(
-                all_doc_tokens, tok_start_position, tok_end_position, tokenizer,
-                example.orig_answer_text)
+            # 中文不需要这一步
+            # (tok_start_position, tok_end_position) = _improve_answer_span(
+            #     all_doc_tokens, tok_start_position, tok_end_position, tokenizer,
+            #     example.orig_answer_text)
 
         # The -3 accounts for [CLS], [SEP] and [SEP]
         max_tokens_for_doc = max_seq_length - len(query_tokens) - 3
@@ -350,9 +388,10 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 start_position = cls_index
                 end_position = cls_index
 
-            if example_index < 20:
+            if example_index < 5:
                 logger.info("*** Example ***")
                 logger.info("unique_id: %s" % (unique_id))
+                logger.info("qas_id: %s" % (example.qas_id))
                 logger.info("example_index: %s" % (example_index))
                 logger.info("doc_span_index: %s" % (doc_span_index))
                 logger.info("tokens: %s" % " ".join(tokens))
@@ -606,7 +645,7 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                         text="",
                         start_logit=null_start_logit,
                         end_logit=null_end_logit))
-                
+
             # In very rare edge cases we could only have single null prediction.
             # So we just create a nonce prediction in this case to avoid failure.
             if len(nbest)==1:
@@ -771,7 +810,7 @@ def write_predictions_extended(all_examples, all_features, all_results, n_best_s
 
             # XLNet un-tokenizer
             # Let's keep it simple for now and see if we need all this later.
-            # 
+            #
             # tok_start_to_orig_index = feature.tok_start_to_orig_index
             # tok_end_to_orig_index = feature.tok_end_to_orig_index
             # start_orig_pos = tok_start_to_orig_index[pred.start_index]

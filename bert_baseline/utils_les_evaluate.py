@@ -14,6 +14,34 @@ import os
 import re
 import string
 import sys
+from metric import normalize, compute_bleu_rouge
+
+
+# 莱斯杯评测函数
+def evaluate_on_les(all_predictions, ref_file_path):
+    """
+    直接复用了Dureader关于rouge-l和bleu4的函数
+    Args:
+        all_predictions: dict类型, 其中key代表question_id, value代表预测答案字符串
+        ref_file_path: 参考文件路径, 每一行均是json格式, 其中的answers字段是参考答案的list
+    Return:
+        dict类型, bleu和rouge-l的分数
+    """
+    ref_dict = {}
+    with open(ref_file_path) as fin:
+        for line in fin:
+            line = line.strip()
+            if not line: continue
+            sample = json.loads(line)
+            sample['answers'] = normalize(sample['answers'])
+            ref_dict[sample['question_id']] = sample['answers']
+    assert len(all_predictions.keys()) == len(ref_dict.keys())
+    pred_dict = {}
+    for question_id, sample in ref_dict.items():
+        pred_dict[question_id] = normalize([all_predictions[str(question_id)]])
+    bleu_rouge = compute_bleu_rouge(pred_dict, ref_dict)
+    return bleu_rouge
+
 
 class EVAL_OPTS():
   def __init__(self, data_file, pred_file, out_file="",
@@ -176,7 +204,7 @@ def make_precision_recall_eval(scores, na_probs, num_true_pos, qid_to_has_ans,
     plot_pr_curve(precisions, recalls, out_image, title)
   return {'ap': 100.0 * avg_prec}
 
-def run_precision_recall_analysis(main_eval, exact_raw, f1_raw, na_probs, 
+def run_precision_recall_analysis(main_eval, exact_raw, f1_raw, na_probs,
                                   qid_to_has_ans, out_image_dir):
   if out_image_dir and not os.path.exists(out_image_dir):
     os.makedirs(out_image_dir)
@@ -310,7 +338,7 @@ def main(OPTS):
   if OPTS.na_prob_file:
     find_all_best_thresh(out_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans)
   if OPTS.na_prob_file and OPTS.out_image_dir:
-    run_precision_recall_analysis(out_eval, exact_raw, f1_raw, na_probs, 
+    run_precision_recall_analysis(out_eval, exact_raw, f1_raw, na_probs,
                                   qid_to_has_ans, OPTS.out_image_dir)
     histogram_na_prob(na_probs, has_ans_qids, OPTS.out_image_dir, 'hasAns')
     histogram_na_prob(na_probs, no_ans_qids, OPTS.out_image_dir, 'noAns')
@@ -326,5 +354,5 @@ if __name__ == '__main__':
   if OPTS.out_image_dir:
     import matplotlib
     matplotlib.use('Agg')
-    import matplotlib.pyplot as plt 
+    import matplotlib.pyplot as plt
   main(OPTS)

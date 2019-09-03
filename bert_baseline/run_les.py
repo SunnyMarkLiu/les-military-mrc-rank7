@@ -41,14 +41,14 @@ from pytorch_transformers import (WEIGHTS_NAME, BertConfig,
 
 from pytorch_transformers import AdamW, WarmupLinearSchedule
 
-from utils_squad import (read_squad_examples, convert_examples_to_features,
+from utils_les import (read_squad_examples, convert_examples_to_features,
                          RawResult, write_predictions,
                          RawResultExtended, write_predictions_extended)
 
 # The follwing import is the official SQuAD evaluation script (2.0).
 # You can remove it from the dependencies if you are using this script outside of the library
 # We've added it here for automated tests (see examples/test_examples.py file)
-from utils_squad_evaluate import EVAL_OPTS, main as evaluate_on_squad
+from utils_les_evaluate import EVAL_OPTS, main as evaluate_on_squad
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +132,9 @@ def train(args, train_dataset, model, tokenizer):
             model.train()
             batch = tuple(t.to(args.device) for t in batch)
             inputs = {'input_ids':       batch[0],
-                      'attention_mask':  batch[1], 
-                      'token_type_ids':  None if args.model_type == 'xlm' else batch[2],  
-                      'start_positions': batch[3], 
+                      'attention_mask':  batch[1],
+                      'token_type_ids':  None if args.model_type == 'xlm' else batch[2],
+                      'start_positions': batch[3],
                       'end_positions':   batch[4]}
             if args.model_type in ['xlnet', 'xlm']:
                 inputs.update({'cls_index': batch[5],
