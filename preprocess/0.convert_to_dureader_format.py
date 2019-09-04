@@ -47,8 +47,10 @@ for rid, row in tqdm(train_df.iterrows(), total=train_df.shape[0]):
         else:
             is_selected = False
 
-        paragraphs = [para.strip() for para in row['content{}'.format(docid)].split('。')]
-        paragraphs = [para + '。' for para in paragraphs if para != '']
+        # 注意supporting_paragraph存在句号，所以在转成dureader时候按照句号进行切分句子存在缺陷！
+        # 观察数据发现按照双空格'  '划分段落
+        paragraphs = [para.strip() for para in row['content{}'.format(docid)].split('  ')]
+        paragraphs = [para for para in paragraphs if para != '']
 
         supported_para_ids = []
 
@@ -80,8 +82,10 @@ for rid, row in tqdm(test_df.iterrows(), total=test_df.shape[0]):
               'documents': []}
 
     for docid in range(1, 6):
-        paragraphs = [para.strip() for para in row['content{}'.format(docid)].split('。')]
-        paragraphs = [para + '。' for para in paragraphs if para != '']
+        # 注意supporting_paragraph存在句号，所以在转成dureader时候按照句号进行切分句子存在缺陷！
+        # 观察数据发现按照双空格'  '划分段落
+        paragraphs = [para.strip() for para in row['content{}'.format(docid)].split('  ')]
+        paragraphs = [para for para in paragraphs if para != '']
 
         sample['documents'].append({
             'title': row['title{}'.format(docid)],
