@@ -99,3 +99,4 @@ result/*.csv
 .~*.xlsx
 models/
 runs/
+.DS_store
