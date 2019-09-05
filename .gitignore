@@ -97,3 +97,6 @@ input/*.pkl
 result/*.csv
 .idea
 .~*.xlsx
+models/
+runs/
+.DS_store
