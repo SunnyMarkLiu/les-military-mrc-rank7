@@ -34,12 +34,13 @@ def remove_unicode_space(text):
 
 # --------------- remove url ---------------
 URL_REGEX1 = r"""(?i)\b((?:https?:(?:/{1,3}|[a-z0-9%])|[a-z0-9.\-]+[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)/)(?:[^\s()<>{}\[\]]+|\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\))+(?:\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\)|[^\s`!()\[\]{};:\'\".,<>?«»“”‘’])|(?:(?<!@)[a-z0-9]+(?:[.\-][a-z0-9]+)*[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)\b/?(?!@)))"""
-URL_REGEX2 = r'[^\u4e00-\u9fa5|[$-_@.&+]]*(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+# 该正则会导致某些答案被清洗掉
+# URL_REGEX2 = r'[^\u4e00-\u9fa5|[$-_@.&+]]*(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
 
 
 def remove_url_links(text):
     text = re.sub(URL_REGEX1, '', text)
-    text = re.sub(URL_REGEX2, '', text)
+    # text = re.sub(URL_REGEX2, '', text)
     return text
 
 
@@ -119,6 +120,8 @@ def clean_text(text, is_supporting_paragraph=False):
 def clean_sample(sample):
     sample['question'] = clean_text(sample['question'])
     sample['keyword'] = clean_text(sample['keyword'])
+    if 'answer' in sample:
+        sample['answer'] = clean_text(sample['answer'], is_supporting_paragraph=True)
     if 'supporting_paragraph' in sample:
         sample['supporting_paragraph'] = clean_text(sample['supporting_paragraph'], is_supporting_paragraph=True)
 
@@ -134,6 +137,55 @@ def clean_sample(sample):
         document['paragraphs'] = new_paras
 
 
+def combine_short_and_split_long_para(sample, min_para_len=200, max_min_times=1.5):
+    """
+    对于长度小于 min_para_len 阈值的 para 选择和后面的进行拼接；
+    对于长度大于 max_min_times * min_para_len 阈值的 para 进行切分小段落，同时小段落再进行拼接；
+    """
+    for document in sample['documents']:
+        concated_paras = []
+
+        pid = 0
+        added_para = ''
+        # 拼接很短的段落
+        while pid < len(document['paragraphs']):
+            added_para += document['paragraphs'][pid]
+            if len(added_para) > min_para_len:
+                concated_paras.append(added_para)
+                added_para = ''
+            pid += 1
+        if len(added_para) > 0:     # 注意加上最后一个para
+            concated_paras.append(added_para)
+
+        # 切分很长的段落
+        pid = 0
+        added_para = ''
+        splited_paras = []
+        while pid < len(concated_paras):
+            para = concated_paras[pid]
+            if len(para) <= max_min_times * min_para_len:
+                splited_paras.append(para)
+            else:
+                sub_sents = para.split('。')
+                sid = 0
+                added_sent = ''
+                # 拼接很短的段落
+                while sid < len(sub_sents):
+                    added_sent += sub_sents[sid]
+                    if len(added_sent) > min_para_len:
+                        splited_paras.append(added_sent)
+                        added_sent = ''
+                    sid += 1
+                if len(added_sent) > 0:
+                    # 如果最后一个 para 较短，拼接到前面一个para
+                    if len(added_sent) < min_para_len:
+                        splited_paras[-1] = splited_paras[-1] + added_sent
+                    else:
+                        splited_paras.append(added_sent)
+            pid += 1
+
+        document['paragraphs'] = splited_paras
+
 if __name__ == '__main__':
     for line in sys.stdin:
         if not line.startswith('{'):
@@ -141,4 +193,5 @@ if __name__ == '__main__':
 
         sample = json.loads(line.strip())
         clean_sample(sample)
+        combine_short_and_split_long_para(sample)
         print(json.dumps(sample, ensure_ascii=False))
