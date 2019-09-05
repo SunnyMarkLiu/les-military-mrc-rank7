@@ -58,6 +58,7 @@ def remove_low_match_score_paras(sample, match_score_pattern, low_match_score_th
     """
     match_score_col = 'para_match_{}s'.format(match_score_pattern)
 
+    new_docs = []
     # 根据 match score 过滤得分低于阈值的段落
     for doc in sample['documents']:
         new_paragraphs = []
@@ -65,41 +66,20 @@ def remove_low_match_score_paras(sample, match_score_pattern, low_match_score_th
         removed_para_ids = np.where(scores <= low_match_score_threshold)[0].tolist()
         if len(removed_para_ids) > 0:
             for para_id, para in enumerate(doc['paragraphs']):
-                if para_id in removed_para_ids:
-                    continue
-                new_paragraphs.append(para)
+                if para_id not in removed_para_ids:
+                    new_paragraphs.append(para)
 
             doc['paragraphs'] = new_paragraphs
+        new_docs.append(doc)
 
-    # 更新 supporting_paragraph_id
-    supported_doc_ids = find_support_para_in_docid(sample['supporting_paragraph'])
-    for sid in supported_doc_ids:
-        doc = sample['documents'][sid - 1]
+    sample['documents'] = new_docs
+    return sample
 
-        # 该 doc 中支撑答案的段落 id
-        supported_para_ids = []
-
-        sents = sample['supporting_paragraph'].split('@content{}@'.format(sid))
-        for supported_sent in sents:
-            if supported_sent != '' and '@content' not in supported_sent:
-                # 找到 supported_sent 所在的 para id
-                max_recall = -1
-                supported_para_id = None
-                for pid, para in enumerate(doc['paragraphs']):
-                    pre_para = doc['paragraphs'][pid - 1] if pid > 0 else ''
-                    ngramed_para = pre_para + para
-
-                    recall = precision_recall_f1(ngramed_para, supported_sent)[1]
-                    if recall > max_recall:
-                        supported_para_id = pid
-                        max_recall = recall
-
-                supported_para_ids.append(supported_para_id)
-
-        supported_para_ids = sorted(list(set(supported_para_ids)))
-        doc['supported_para_ids'] = supported_para_ids
-
-
+def remove_not_related_sentence(sample):
+    """
+    去除不相关的句子
+    """
+    
 if __name__ == '__main__':
     match_score_pattern = sys.argv[1]
     low_match_score_threshold = float(sys.argv[2])
@@ -109,5 +89,5 @@ if __name__ == '__main__':
             continue
 
         sample = json.loads(line.strip())
-        remove_low_match_score_paras(sample, match_score_pattern, low_match_score_threshold)
+        sample = remove_low_match_score_paras(sample, match_score_pattern, low_match_score_threshold)
         print(json.dumps(sample, ensure_ascii=False))

@@ -89,6 +89,9 @@ remove_regx_map = collections.OrderedDict({
     r'(\!|\"|\#|\$|\%|\&|\'|\(|\)|\*|\+|\,|\-|\.|\/|\:|\;|\<|\=|\>|\?|\@|\[|\\|\]|\^|\_|\`|\{|\||\}|\~)\1{1,}': '\g<1>',
     r'("""|＃|＄|％|＆|＇|（|）|＊|＋|，|－|／|：|；|＜|＝|＞|＠|［|＼|］|＾|＿|｀|｛|｜|｝|～|｟|｠|｢|｣|､|　|、|〃|〈|〉|《|》|'
     r'「|」|『|』|【|】|〔|〕|〖|〗|〘|〙|〚|〛|〜|〝|〞|〟|〰|〾|〿|–|—|‘|’|‛|“|”|„|‟|…|‧|﹏|﹑|﹔|·|！|？|｡|。)\1{1,}': '\g<1>',
+    r'图\d+': '',
+    r'\(记者[^\)]*\){1}': '',
+    r'转自铁血社区': ''
 })
 
 
@@ -160,19 +163,6 @@ def precision_recall_f1(prediction, ground_truth):
     return p, r, f1
 
 
-# def ques_para_match_score(question, para):
-#     """
-#     计算问题和段落的匹配得分
-#
-#     Args:
-#         question: str
-#         para: str
-#     """
-#     p, r, f1 = precision_recall_f1(para, question)
-#     match_score = p, r, f1
-#     return match_score
-
-
 content_pattern = re.compile(r'@content\d@')
 def find_support_para_in_docid(support_para):
     docs = content_pattern.findall(support_para)
@@ -191,6 +181,7 @@ def calc_match_scores_paras(sample):
             pre_para = doc['paragraphs'][pid - 1] if pid > 0 else ''
             ngramed_para = pre_para + para
 
+            # 注意：实际计算 match score 采取的方式：para ngram
             match_scores = precision_recall_f1(ngramed_para, sample['question'] + sample['keyword'])
             para_match_precisions.append(match_scores[0])
             para_match_recalls.append(match_scores[1])
@@ -199,11 +190,13 @@ def calc_match_scores_paras(sample):
         doc['para_match_recalls'] = para_match_recalls
         doc['para_match_f1s'] = para_match_f1s
 
-    # 找到答案所支撑的 docid
+    # 找到答案所支撑的 docid, paraid
     if 'supporting_paragraph' not in sample:
         return
 
     supported_doc_ids = find_support_para_in_docid(sample['supporting_paragraph'])
+    sample['supported_doc_ids'] = supported_doc_ids
+
     for sid in supported_doc_ids:
         doc = sample['documents'][sid - 1]
 
