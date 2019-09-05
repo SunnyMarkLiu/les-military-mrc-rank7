@@ -91,9 +91,11 @@ remove_regx_map = collections.OrderedDict({
     r'「|」|『|』|【|】|〔|〕|〖|〗|〘|〙|〚|〛|〜|〝|〞|〟|〰|〾|〿|–|—|‘|’|‛|“|”|„|‟|…|‧|﹏|﹑|﹔|·|！|？|｡|。)\1{1,}': '\g<1>',
     r'图\d+': '',
     r'\(记者[^\)]*\){1}': '',
-    r'转自铁血社区': ''
+    r'转自铁血社区': '',
+    r'０': '0', r'１': '1', r'２': '2', r'３': '3', r'４': '4',
+    r'５': '4', r'６': '6', r'７': '7', r'８': '8', r'９': '9',
+    r'．': '.'
 })
-
 
 def remove_by_regex(text):
     text = text.strip()
@@ -131,97 +133,6 @@ def clean_sample(sample):
                 new_paras.append(para)
         document['paragraphs'] = new_paras
 
-# -------------------- 计算 paragraph 与question，supporting_paragraph 与 paragraph 的匹配得分 --------------------
-
-def precision_recall_f1(prediction, ground_truth):
-    """
-    This function calculates and returns the precision, recall and f1-score
-    Args:
-        prediction: prediction string or list to be matched
-        ground_truth: golden string or list reference
-    Returns:
-        floats of (p, r, f1)
-    Raises:
-        None
-    """
-    if not isinstance(prediction, list):
-        prediction_tokens = list(prediction)
-    else:
-        prediction_tokens = prediction
-    if not isinstance(ground_truth, list):
-        ground_truth_tokens = list(ground_truth)
-    else:
-        ground_truth_tokens = ground_truth
-
-    common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
-    num_same = sum(common.values())
-    if num_same == 0:
-        return 0, 0, 0
-    p = 1.0 * num_same / len(prediction_tokens)
-    r = 1.0 * num_same / len(ground_truth_tokens)
-    f1 = (2 * p * r) / (p + r)
-    return p, r, f1
-
-
-content_pattern = re.compile(r'@content\d@')
-def find_support_para_in_docid(support_para):
-    docs = content_pattern.findall(support_para)
-    return list(set([int(doc[-2:-1]) for doc in docs]))
-
-def calc_match_scores_paras(sample):
-    """
-    计算 paragraph 与question，supporting_paragraph 与 paragraph 的匹配得分
-    用于后期的 paragraph selection
-    """
-    for doc in sample['documents']:
-        para_match_precisions = []
-        para_match_recalls = []
-        para_match_f1s = []
-        for pid, para in enumerate(doc['paragraphs']):
-            pre_para = doc['paragraphs'][pid - 1] if pid > 0 else ''
-            ngramed_para = pre_para + para
-
-            # 注意：实际计算 match score 采取的方式：para ngram
-            match_scores = precision_recall_f1(ngramed_para, sample['question'] + sample['keyword'])
-            para_match_precisions.append(match_scores[0])
-            para_match_recalls.append(match_scores[1])
-            para_match_f1s.append(match_scores[2])
-        doc['para_match_precisions'] = para_match_precisions
-        doc['para_match_recalls'] = para_match_recalls
-        doc['para_match_f1s'] = para_match_f1s
-
-    # 找到答案所支撑的 docid, paraid
-    if 'supporting_paragraph' not in sample:
-        return
-
-    supported_doc_ids = find_support_para_in_docid(sample['supporting_paragraph'])
-    sample['supported_doc_ids'] = supported_doc_ids
-
-    for sid in supported_doc_ids:
-        doc = sample['documents'][sid - 1]
-
-        # 该 doc 中支撑答案的段落 id
-        supported_para_ids = []
-
-        sents = sample['supporting_paragraph'].split('@content{}@'.format(sid))
-        for supported_sent in sents:
-            if supported_sent != '' and '@content' not in supported_sent:
-                # 找到 supported_sent 所在的 para id
-                max_recall = -1
-                supported_para_id = None
-                for pid, para in enumerate(doc['paragraphs']):
-                    pre_para = doc['paragraphs'][pid - 1] if pid > 0 else ''
-                    ngramed_para = pre_para + para
-
-                    recall = precision_recall_f1(ngramed_para, supported_sent)[1]
-                    if recall > max_recall:
-                        supported_para_id = pid
-                        max_recall = recall
-
-                supported_para_ids.append(supported_para_id)
-
-        supported_para_ids = sorted(list(set(supported_para_ids)))
-        doc['supported_para_ids'] = supported_para_ids
 
 if __name__ == '__main__':
     for line in sys.stdin:
@@ -230,5 +141,4 @@ if __name__ == '__main__':
 
         sample = json.loads(line.strip())
         clean_sample(sample)
-        calc_match_scores_paras(sample)
         print(json.dumps(sample, ensure_ascii=False))
