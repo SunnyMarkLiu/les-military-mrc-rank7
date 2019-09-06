@@ -191,7 +191,7 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                     doc_tokens = list(context_list[doc_id])
                     char_to_word_offset = list(range(len(doc_tokens)))
 
-                    qas_id = '{}##{}--0'.format(sample['question_id'], doc_id)
+                    qas_id = '{}##{}##0'.format(sample['question_id'], doc_id)
                     start_position = None
                     end_position = None
                     orig_answer_text = ""
@@ -432,6 +432,11 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                     end_position=end_position,
                     is_impossible=span_is_impossible))
             unique_id += 1
+
+    # 打印未识别或者被跳过的token
+    logger.warning('######print unk and skipped tokens with their counts######')
+    logger.warning('the unk tokens is : {}'.format(unk_tokens_dict))
+    logger.warning('the skipped tokens is : {}'.format(skipped_tokens_dict))
 
     return features
 
