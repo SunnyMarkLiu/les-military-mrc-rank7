@@ -56,7 +56,6 @@ def para_question_best_coverage_score(paragraph, question):
     best_start_idx = -1
     best_end_idx = -1
     for start_idx in range(0, len(paragraph)):
-        # 开始的词不在答案中，或者，开始的词为标点符号或splitter，直接过滤
         if paragraph[start_idx] not in question:
             continue
 
@@ -68,7 +67,7 @@ def para_question_best_coverage_score(paragraph, question):
             # 计算该片段和 question 的 recall
             recall = precision_recall_f1(sub_para_content, question)[1]
 
-            if recall > best_recall:
+            if recall >= best_recall:
                 best_recall = recall
                 best_start_idx = start_idx
                 best_end_idx = end_idx
