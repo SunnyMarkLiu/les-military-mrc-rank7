@@ -11,7 +11,6 @@ import re
 import sys
 import json
 import collections
-from collections import Counter
 
 
 # --------------- remove space ---------------
@@ -159,7 +158,6 @@ def combine_short_and_split_long_para(sample, min_para_len=200, max_min_times=1.
 
         # 切分很长的段落
         pid = 0
-        added_para = ''
         splited_paras = []
         while pid < len(concated_paras):
             para = concated_paras[pid]
