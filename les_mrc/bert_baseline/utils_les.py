@@ -132,11 +132,16 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
 
             sample = json.loads(line)
             question_text = sample['question']
-            context_num = len(sample['documents'])
-            context_list = [doc['passage'] for doc in sample['documents']]
+            context_num = len(sample['documents'])  # 莱斯杯固定都是5个
+            context_list = [doc['content'] for doc in sample['documents']]
 
             if is_training:
-                match_doc_ids = sample['best_match_doc_ids']
+                # answer_labels字段代表(docid, start, end)
+                if len(sample['answer_labels']) == 0:
+                    logger.warning('There is an empty answer training sample in les-json-data, line_id={}'.format(line_id + 1))
+                    continue
+                match_doc_ids = [label[0] for label in sample['answer_labels']]
+                sample['answer_labels'] = [[label[1], label[2]] for label in sample['answer_labels']]
 
                 for doc_id in range(context_num):  # doc_id代表进行到一个例子中的第几个documents了
                     doc_tokens = []
@@ -152,7 +157,9 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                             count += 1
                             qas_id = '{}##{}##{}'.format(sample['question_id'], doc_id, count)
                             start_position = start
-                            end_position = end
+                            # TODO 这里临时减一!!
+                            end_position = end - 1
+                            # TODO 这里临时减一!!
                             orig_answer_text = doc_tokens[start:end + 1]
                             is_impossible = False
 
@@ -254,9 +261,17 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                     unk_tokens_dict[token] += 1
                 if len(sub_tokens) == 0:
                     skipped_tokens_dict[token] += 1
+                    sub_tokens = ['[unused2]']
             for sub_token in sub_tokens:
                 tok_to_orig_index.append(i)
                 all_doc_tokens.append(sub_token)
+
+        # 在这里doc_tokens和all_doc_tokens长度应该完全一样
+        assert len(example.doc_tokens) == len(all_doc_tokens)
+        for key, value in enumerate(tok_to_orig_index):
+            assert key == value
+        for key, value in enumerate(orig_to_tok_index):
+            assert key == value
 
         tok_start_position = None
         tok_end_position = None

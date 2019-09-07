@@ -2,7 +2,7 @@
 set -ex
 DATA_DIR="/home/len/yingzq/dureader"
 MODEL_DIR="/home/len/yingzq/pretrained-models/chinese_L-12_H-768_A-12"
-RELOAD_MODEL_DIR="models/bert_finetuned_dureader_test"
+RELOAD_MODEL_DIR="models/bert_finetuned_les"
 
 python run_les.py \
     --model_type bert \
