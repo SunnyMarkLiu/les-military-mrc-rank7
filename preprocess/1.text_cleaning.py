@@ -142,5 +142,4 @@ if __name__ == '__main__':
 
         sample = json.loads(line.strip())
         clean_sample(sample)
-        # combine_short_and_split_long_para(sample)
         print(json.dumps(sample, ensure_ascii=False))

@@ -57,7 +57,7 @@ def combine_short_and_split_long_para(sample, min_para_len=200, max_min_times=1.
                         splited_paras.append(added_sent)
             pid += 1
 
-        document['paragraphs'] = splited_paras
+        document['paragraphs'] = concated_paras
 
 
 if __name__ == '__main__':
