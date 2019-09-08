@@ -100,3 +100,4 @@ result/*.csv
 models/
 runs/
 .DS_store
+*dict.txt

@@ -11,8 +11,9 @@ python run_les.py \
     --config_name $MODEL_DIR/bert_config.json \
     --tokenizer_name $MODEL_DIR/vocab.txt \
     --do_eval \
+    --do_only_predict \
     --do_lower_case \
-    --predict_file $DATA_DIR/les.dev.json \
+    --predict_file $DATA_DIR/split_test_01 \
     --output_dir $RELOAD_MODEL_DIR \
     --version_2_with_negative \
     --max_seq_length 512 \
