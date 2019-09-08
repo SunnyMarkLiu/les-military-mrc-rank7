@@ -121,6 +121,7 @@ def train(args, train_dataset, model, tokenizer):
     logger.info("  Gradient Accumulation steps = %d", args.gradient_accumulation_steps)
     logger.info("  Total optimization steps = %d", t_total)
 
+    best_rouge_l = 0.0
     global_step = 0
     tr_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
@@ -168,6 +169,20 @@ def train(args, train_dataset, model, tokenizer):
                     logger.info('eval at {} global steps: {}'.format(global_step, results))
                     for key, value in results.items():
                         tb_writer.add_scalar('eval_{}'.format(key), value, global_step)
+                    # 记录并保存最好的模型
+                    if results['Rouge-L'] > best_rouge_l:
+                        logger.warning('New record at {} global steps, its rouge-l score is {}'
+                                       .format(global_step, results['Rouge-L']))
+                        best_rouge_l = results['Rouge-L']
+
+                        # Save best model
+                        logger.info('Saving new best score model...')
+                        output_dir = os.path.join(args.output_dir, 'checkpoint-best')
+                        if not os.path.exists(output_dir):
+                            os.makedirs(output_dir)
+                        model_to_save = model.module if hasattr(model, 'module') else model  # Take care of distributed/parallel training
+                        model_to_save.save_pretrained(output_dir)
+                        torch.save(args, os.path.join(output_dir, 'training_args.bin'))
 
                 if args.local_rank in [-1, 0] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
                     # Log metrics
@@ -199,7 +214,7 @@ def train(args, train_dataset, model, tokenizer):
     return global_step, tr_loss / global_step
 
 
-def evaluate(args, model, tokenizer, prefix=""):
+def evaluate(args, model, tokenizer, prefix="les"):
     dataset, examples, features = load_and_cache_examples(args, tokenizer, evaluate=True, output_examples=True)
 
     if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
@@ -247,8 +262,10 @@ def evaluate(args, model, tokenizer, prefix=""):
             all_results.append(result)
 
     # Compute predictions
-    output_prediction_file = os.path.join(args.output_dir, "predictions_{}.json".format(prefix))
-    output_nbest_file = os.path.join(args.output_dir, "nbest_predictions_{}.json".format(prefix))
+    output_prediction_file = os.path.join(args.output_dir, "predictions_{}_{}.json"
+                                          .format(prefix, 'test' if args.do_only_predict else 'dev'))
+    output_nbest_file = os.path.join(args.output_dir, "nbest_predictions_{}_{}.json"
+                                     .format(prefix, 'test' if args.do_only_predict else 'dev'))
     if args.version_2_with_negative:
         output_null_log_odds_file = os.path.join(args.output_dir, "null_odds_{}.json".format(prefix))
     else:
@@ -272,7 +289,10 @@ def evaluate(args, model, tokenizer, prefix=""):
     #                              pred_file=output_prediction_file,
     #                              na_prob_file=output_null_log_odds_file)
     # results = evaluate_on_squad(evaluate_options)
-    results = evaluate_on_les(all_predictions, args.predict_file)
+    if args.do_only_predict:
+        results = {'info': 'No score when predict on test set'}
+    else:
+        results = evaluate_on_les(all_predictions, args.predict_file)
     return results
 
 
@@ -282,18 +302,37 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
 
     # Load data features from cache or dataset file
     input_file = args.predict_file if evaluate else args.train_file
+    data_type = None
+    if args.do_only_predict:
+        data_type = 'test'
+    elif evaluate:
+        data_type = 'dev'
+    else:
+        data_type = 'train'
     cached_features_file = os.path.join(os.path.dirname(input_file), 'cached_{}_{}_{}'.format(
-        'dev' if evaluate else 'train',
+        data_type,
         list(filter(None, args.model_name_or_path.split('/'))).pop(),
         str(args.max_seq_length)))
-    if os.path.exists(cached_features_file) and not args.overwrite_cache and not output_examples:
+
+    examples = None
+    features = None
+    if os.path.exists(cached_features_file) and not args.overwrite_cache:
         logger.info("Loading features from cached file %s", cached_features_file)
         features = torch.load(cached_features_file)
-    else:
-        logger.info("Creating features from dataset file at %s", input_file)
+
+    if output_examples:
+        logger.info("Reading examples from dataset file at %s", input_file)
         examples = read_squad_examples(input_file=input_file,
                                                 is_training=not evaluate,
                                                 version_2_with_negative=args.version_2_with_negative)
+
+    if not features:
+        logger.info("Creating features")
+        if not examples:
+            logger.info("Creating features from dataset file at %s", input_file)
+            examples = read_squad_examples(input_file=input_file,
+                                                    is_training=not evaluate,
+                                                    version_2_with_negative=args.version_2_with_negative)
         features = convert_examples_to_features(examples=examples,
                                                 tokenizer=tokenizer,
                                                 max_seq_length=args.max_seq_length,
@@ -332,10 +371,10 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
 def main():
     parser = argparse.ArgumentParser()
 
-    ## Required parameters
-    parser.add_argument("--train_file", default=None, type=str, required=True,
+    ## 文件路径
+    parser.add_argument("--train_file", default=None, type=str, required=False,
                         help="SQuAD json for training. E.g., train-v1.1.json")
-    parser.add_argument("--predict_file", default=None, type=str, required=True,
+    parser.add_argument("--predict_file", default=None, type=str, required=False,
                         help="SQuAD json for predictions. E.g., dev-v1.1.json or test-v1.1.json")
     parser.add_argument("--model_type", default=None, type=str, required=True,
                         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
@@ -343,6 +382,10 @@ def main():
                         help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(ALL_MODELS))
     parser.add_argument("--output_dir", default=None, type=str, required=True,
                         help="The output directory where the model checkpoints and predictions will be written.")
+
+    ## 设置需要使用的GPU编号
+    parser.add_argument("--cuda_devices", default=None, type=str, required=True,
+                        help="set which gpu(s) will be use, e.g. '0,2,3'.")
 
     ## Other parameters
     parser.add_argument("--config_name", default="", type=str,
@@ -369,8 +412,10 @@ def main():
                         help="Whether to run training.")
     parser.add_argument("--do_eval", action='store_true',
                         help="Whether to run eval on the dev set.")
+    parser.add_argument("--do_only_predict", action='store_true',
+                        help="Only do predict when evaluating.")
     parser.add_argument("--evaluate_during_training", action='store_true',
-                        help="Rul evaluation during training at each logging step.")
+                        help="Rul evaluation during training.")
     parser.add_argument("--do_lower_case", action='store_true',
                         help="Set this flag if you are using an uncased model.")
 
@@ -408,7 +453,7 @@ def main():
     parser.add_argument('--save_steps', type=int, default=50,
                         help="Save checkpoint every X updates steps.")
     parser.add_argument('--eval_steps', type=int, default=1000,
-                        help="Eval on predict file every X updates steps.")
+                        help="Eval on eval file every X updates steps.")
     parser.add_argument("--eval_all_checkpoints", action='store_true',
                         help="Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number")
     parser.add_argument("--no_cuda", action='store_true',
@@ -430,6 +475,10 @@ def main():
     parser.add_argument('--server_ip', type=str, default='', help="Can be used for distant debugging.")
     parser.add_argument('--server_port', type=str, default='', help="Can be used for distant debugging.")
     args = parser.parse_args()
+
+    # 设置cuda devices
+    logger.warning('we set CUDA_VISIBLE_DEVICES: {}'.format(args.cuda_devices))
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_devices
 
     if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train and not args.overwrite_output_dir:
         raise ValueError("Output directory ({}) already exists and is not empty. Use --overwrite_output_dir to overcome.".format(args.output_dir))
@@ -526,7 +575,7 @@ def main():
             model.to(args.device)
 
             # Evaluate
-            result = evaluate(args, model, tokenizer, prefix=global_step)
+            result = evaluate(args, model, tokenizer, prefix=global_step if global_step else 'checkpoint')
 
             result = dict((k + ('_{}'.format(global_step) if global_step else ''), v) for k, v in result.items())
             results.update(result)

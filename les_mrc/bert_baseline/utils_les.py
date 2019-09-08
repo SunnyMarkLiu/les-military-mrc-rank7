@@ -120,7 +120,7 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
 
     examples = []
     with open(input_file) as fin:
-        log_steps = 3000  # log打印间隔
+        log_steps = 5000  # log打印间隔
         for line_id, line in enumerate(fin):
             line = line.strip()
 
@@ -154,12 +154,16 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                         count = 0  # 代表同一个document有多少个答案
                         for match_id, (start, end) in zip(match_doc_ids, sample['answer_labels']):
                             if doc_id != match_id: continue
+                            # TODO 临时减1
+                            end = end - 1
+                            # 有些例子的start, end不在有效范围内
+                            if start > end or start not in char_to_word_offset or end not in char_to_word_offset:
+                                logger.warning('{}##{}##{} has index bug'.format(sample['question_id'], doc_id, count))
+                                continue
                             count += 1
                             qas_id = '{}##{}##{}'.format(sample['question_id'], doc_id, count)
                             start_position = start
-                            # TODO 这里临时减一!!
-                            end_position = end - 1
-                            # TODO 这里临时减一!!
+                            end_position = end
                             orig_answer_text = doc_tokens[start:end + 1]
                             is_impossible = False
 
@@ -230,10 +234,31 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     # max_N, max_M = 1024, 1024
     # f = np.zeros((max_N, max_M), dtype=np.float32)
 
+    # 对一些重要的未识别字符做一个映射
+    convert_token_list = {
+        '“': '"',
+        '”': '"',
+        '…': '...',
+        '﹤': '<',
+        '﹥': '>',
+        '‘': "'",
+        '’': "'",
+        '﹪': '%',
+        'Ⅹ': 'x',
+        '―': '-',
+        '—': '-',
+        '–': '-',
+        '﹟': '#',
+        '㈠': '一',
+        ' ': '[unused1]',
+        '[SKIPPED]': '[UNK]'
+        ''
+    }
+
     features = []
     unk_tokens_dict = collections.defaultdict(int)  # 记录vocab中找不到的token
     skipped_tokens_dict = collections.defaultdict(int)  # 记录tokenize后被删掉的token
-    log_steps = 2000  # log打印间隔
+    log_steps = 5000  # log打印间隔
     for (example_index, example) in enumerate(examples):
         if log_steps > 0 and (example_index + 1) % log_steps == 0:
             logger.info('we have converted {} examples to features'.format(example_index + 1))
@@ -241,8 +266,11 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
         # if example_index % 100 == 0:
         #     logger.info('Converting %s/%s pos %s neg %s', example_index, len(examples), cnt_pos, cnt_neg)
 
+        question_text = example.question_text
+        for key, value in convert_token_list.items():
+            question_text = question_text.replace(key, value)
         # TODO 这样似乎question中的英文没分开,也许会有问题
-        query_tokens = tokenizer.tokenize(example.question_text)
+        query_tokens = tokenizer.tokenize(question_text)
 
         if len(query_tokens) > max_query_length:
             query_tokens = query_tokens[0:max_query_length]
@@ -252,16 +280,15 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
         all_doc_tokens = []
         for (i, token) in enumerate(example.doc_tokens):
             orig_to_tok_index.append(len(all_doc_tokens))
-            # TODO 这里将空格单独处理了
-            if token == ' ':
-                sub_tokens = ['[unused1]']
+            if token in convert_token_list:
+                sub_tokens = [convert_token_list[token]]
             else:
                 sub_tokens = tokenizer.tokenize(token)
                 if '[UNK]' in sub_tokens:
                     unk_tokens_dict[token] += 1
                 if len(sub_tokens) == 0:
                     skipped_tokens_dict[token] += 1
-                    sub_tokens = ['[unused2]']
+                    sub_tokens = [convert_token_list['[SKIPPED]']]  # 为了保持长度不变
             for sub_token in sub_tokens:
                 tok_to_orig_index.append(i)
                 all_doc_tokens.append(sub_token)
@@ -452,6 +479,14 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     logger.warning('######print unk and skipped tokens with their counts######')
     logger.warning('the unk tokens is : {}'.format(unk_tokens_dict))
     logger.warning('the skipped tokens is : {}'.format(skipped_tokens_dict))
+    unk_file = '{}_unk_tokens_dict.txt'.format('train' if is_training else 'predict')
+    skipped_file = '{}_skipped_tokens_dict.txt'.format('train' if is_training else 'predict')
+    with open(unk_file, 'w') as fout:
+        for token, cnt in unk_tokens_dict.items():
+            fout.write('{}  {}\n'.format(token, cnt))
+    with open(skipped_file, 'w') as fout:
+        for token, cnt in skipped_tokens_dict.items():
+            fout.write('{}  {}\n'.format(token, cnt))
 
     return features
 
@@ -660,26 +695,26 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                     text=final_text,
                     start_logit=pred.start_logit,
                     end_logit=pred.end_logit))
-        # # if we didn't include the empty option in the n-best, include it
-        # if version_2_with_negative:
-        #     if "" not in seen_predictions:
-        #         nbest.append(
-        #             _NbestPrediction(
-        #                 text="",
-        #                 start_logit=null_start_logit,
-        #                 end_logit=null_end_logit))
-        #
-        #     # In very rare edge cases we could only have single null prediction.
-        #     # So we just create a nonce prediction in this case to avoid failure.
-        #     if len(nbest)==1:
-        #         nbest.insert(0,
-        #             _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
-        #
-        # # In very rare edge cases we could have no valid predictions. So we
-        # # just create a nonce prediction in this case to avoid failure.
-        # if not nbest:
-        #     nbest.append(
-        #         _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+        # if we didn't include the empty option in the n-best, include it
+        if version_2_with_negative:
+            if "" not in seen_predictions:
+                nbest.append(
+                    _NbestPrediction(
+                        text="",
+                        start_logit=null_start_logit,
+                        end_logit=null_end_logit))
+
+            # In very rare edge cases we could only have single null prediction.
+            # So we just create a nonce prediction in this case to avoid failure.
+            if len(nbest)==1:
+                nbest.insert(0,
+                    _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+
+        # In very rare edge cases we could have no valid predictions. So we
+        # just create a nonce prediction in this case to avoid failure.
+        if not nbest:
+            nbest.append(
+                _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         assert len(nbest) >= 1
 
