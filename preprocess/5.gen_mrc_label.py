@@ -41,7 +41,7 @@ def find_best_match_index(sub_text, content):
         best_start = -1
         best_end = -1
         for start_idx in range(0, len(content)):
-            if content not in sub_text:
+            if content[start_idx] not in sub_text:
                 continue
 
             for end_idx in range(len(content) - 1, start_idx - 1, -1):
