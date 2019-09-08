@@ -28,6 +28,7 @@ from pytorch_transformers.tokenization_bert import BasicTokenizer, whitespace_to
 
 # Required by XLNet evaluation method to compute optimal threshold (see write_predictions_extended() method)
 from utils_les_evaluate import find_all_best_thresh_v2, make_qid_to_has_ans, get_raw_scores
+from eval_metric import normalize, compute_bleu_rouge
 
 logger = logging.getLogger(__name__)
 
@@ -746,26 +747,55 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
             score_diff = score_null - best_non_null_entry.start_logit - (
                 best_non_null_entry.end_logit)
             scores_diff_json[example.qas_id] = score_diff
-            if score_diff > null_score_diff_threshold:
-                # all_predictions[example.qas_id] = ""
-                # TODO 先始终取example中最大的非空答案
-                non_null_prob = best_non_null_entry.start_logit + best_non_null_entry.end_logit
-                all_predictions[example.qas_id] = [best_non_null_entry.text, non_null_prob]
-            else:
-                # all_predictions[example.qas_id] = best_non_null_entry.text
-                non_null_prob = best_non_null_entry.start_logit + best_non_null_entry.end_logit
-                all_predictions[example.qas_id] = [best_non_null_entry.text, non_null_prob]
+            # if score_diff > null_score_diff_threshold:
+            #     # all_predictions[example.qas_id] = ""
+            #     # TODO 先始终取example中最大的非空答案
+            #     non_null_prob = best_non_null_entry.start_logit + best_non_null_entry.end_logit
+            #     all_predictions[example.qas_id] = [best_non_null_entry.text, non_null_prob]
+            # else:
+            #     # all_predictions[example.qas_id] = best_non_null_entry.text
+            #     non_null_prob = best_non_null_entry.start_logit + best_non_null_entry.end_logit
+            #     all_predictions[example.qas_id] = [best_non_null_entry.text, non_null_prob]
 
         all_nbest_json[example.qas_id] = nbest_json
 
-    # 将多个example合成一个sample
     all_samples = collections.defaultdict(list)
-    for qas_id, prediction in all_predictions.items():
-        all_samples[qas_id.split('##')[0]].append(prediction)
+    for qas_id, nbest_json in all_nbest_json.items():
+        text = ''
+        prob = 0.0
+        logit = 0.0
+        for entry in nbest_json:
+            if entry['text']:
+                text = entry['text']
+                logit = entry['start_logit'] + entry['end_logit']
+                prob = entry['probability']
+                break
+        all_samples[qas_id.split('##')[0]].append([text, logit, prob])
     all_predictions = {}
     for question_id, sample in all_samples.items():
         sample = sorted(sample, key=lambda x: x[1], reverse=True)
         all_predictions[question_id] = sample[0][0]
+        # 简单的多答案选择模块
+        # if sample[1][0] != '' and sample[1][2] > 0.3:
+        #     # 有可能具有多答案
+        #     if sample[1][0] in sample[0][0] or sample[0][0] in sample[1][0]:
+        #         continue
+        #     ans1 = normalize([sample[0][0]])
+        #     ans2 = normalize([sample[1][0]])
+        #     bleu_rouge = compute_bleu_rouge({'one_row': ans1}, {'one_row': ans2})
+        #     if bleu_rouge['Bleu-4'] > 0.28 or bleu_rouge['Rouge-L'] > 0.28:
+        #         continue
+        #     logger.warning('{} have multi-ans, take care of it'.format(question_id))
+        #     all_predictions[question_id] = all_predictions[question_id] + '#' + sample[1][0]
+
+    # # 将多个example合成一个sample
+    # all_samples = collections.defaultdict(list)
+    # for qas_id, prediction in all_predictions.items():
+    #     all_samples[qas_id.split('##')[0]].append(prediction)
+    # all_predictions = {}
+    # for question_id, sample in all_samples.items():
+    #     sample = sorted(sample, key=lambda x: x[1], reverse=True)
+    #     all_predictions[question_id] = sample[0][0]
 
     with open(output_prediction_file, "w") as writer:
         writer.write(json.dumps(all_predictions, indent=4, ensure_ascii=False) + "\n")

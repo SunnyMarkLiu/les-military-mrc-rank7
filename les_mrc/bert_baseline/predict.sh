@@ -1,8 +1,8 @@
 #!/bin/bash
 set -ex
 DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/mrc_dataset"
-MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/bert_weights_chinese"
-RELOAD_MODEL_DIR="models/bert_finetuned_les/checkpoint-40000"
+MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
+RELOAD_MODEL_DIR="models/bert_finetuned_les_wwm/checkpoint-best"
 
 python run_les.py \
     --cuda_devices 0 \
