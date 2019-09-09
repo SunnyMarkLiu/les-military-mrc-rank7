@@ -75,7 +75,7 @@ def combine_short_and_split_long_para(sample, min_para_len=100, max_para_len=200
                         splited_paras.append(added_para)
                         added_para = ''
                     else:
-                        added_para += sents[sent_i]
+                        added_para += sents[sent_i] + '。'
                     sent_i += 1
                 if len(added_para) > 0:  # 注意加上最后一个para
                     splited_paras.append(added_para)
