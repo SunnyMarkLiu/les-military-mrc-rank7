@@ -147,13 +147,6 @@ def gen_trainable_dataset(sample):
                     answer_labels.append((ans_in_docid - 1, start_label, end_label))
 
         sample['answer_labels'] = answer_labels
-        # 计算抽取的 fake answer 以及对应的 ceil rougel
-        fake_answers = [sample['documents'][answer_label[0]]['content'][answer_label[1]: answer_label[2] + 1]
-                        for answer_label in answer_labels]
-        sample['fake_answers'] = fake_answers
-        ceil_rougel = Bleu().add_inst(cand=''.join(fake_answers), ref=''.join(answer_texts)).get_score()
-        sample['ceil_rougel'] = ceil_rougel
-
 
 if __name__ == '__main__':
     for line in sys.stdin:
