@@ -24,6 +24,7 @@ Date:    2017/10/06 18:23:06
 
 
 from eval_metric.dureader_eval import compute_bleu_rouge
+from eval_metric.dureader_eval import compute_rouge
 from eval_metric.dureader_eval import normalize
 
 __all__ = [

@@ -136,6 +136,18 @@ def compute_bleu_rouge(pred_dict, ref_dict, bleu_order=4):
     return scores
 
 
+def compute_rouge(pred_dict, ref_dict):
+    """
+    Compute rouge scores.
+    """
+    assert set(pred_dict.keys()) == set(ref_dict.keys()), \
+            "missing keys: {}".format(set(ref_dict.keys()) - set(pred_dict.keys()))
+    scores = {}
+    rouge_score, _ = Rouge().compute_score(ref_dict, pred_dict)
+    scores['Rouge-L'] = rouge_score
+    return scores
+
+
 def local_prf(pred_list, ref_list):
     """
     Compute local precision recall and f1-score,

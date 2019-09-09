@@ -292,7 +292,7 @@ def evaluate(args, model, tokenizer, prefix="les"):
     if args.do_only_predict:
         results = {'info': 'No score when predict on test set'}
     else:
-        results = evaluate_on_les(all_predictions, args.predict_file)
+        results, _ = evaluate_on_les(all_predictions, args.predict_file)
     return results
 
 

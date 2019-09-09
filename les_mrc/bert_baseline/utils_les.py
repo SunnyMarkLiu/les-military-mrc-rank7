@@ -760,13 +760,14 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
         all_nbest_json[example.qas_id] = nbest_json
 
     all_samples = collections.defaultdict(list)
+    need_skippeed_list = [',', '.', '。']
     for qas_id, nbest_json in all_nbest_json.items():
         text = ''
         prob = 0.0
         logit = 0.0
         for entry in nbest_json:
-            if entry['text']:
-                text = entry['text']
+            if entry['text'].strip() and entry['text'] not in need_skippeed_list:
+                text = entry['text'].strip()
                 logit = entry['start_logit'] + entry['end_logit']
                 prob = entry['probability']
                 break
@@ -776,14 +777,14 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
         sample = sorted(sample, key=lambda x: x[1], reverse=True)
         all_predictions[question_id] = sample[0][0]
         # 简单的多答案选择模块
-        # if sample[1][0] != '' and sample[1][2] > 0.3:
+        # if sample[1][0] != '' and sample[1][2] > 0.1:
         #     # 有可能具有多答案
         #     if sample[1][0] in sample[0][0] or sample[0][0] in sample[1][0]:
         #         continue
         #     ans1 = normalize([sample[0][0]])
         #     ans2 = normalize([sample[1][0]])
-        #     bleu_rouge = compute_bleu_rouge({'one_row': ans1}, {'one_row': ans2})
-        #     if bleu_rouge['Bleu-4'] > 0.28 or bleu_rouge['Rouge-L'] > 0.28:
+        #     bleu_rouge = compute_bleu_rouge({'item': ans1}, {'item': ans2})
+        #     if bleu_rouge['Bleu-4'] > 0.5 or bleu_rouge['Rouge-L'] > 0.5:
         #         continue
         #     logger.warning('{} have multi-ans, take care of it'.format(question_id))
         #     all_predictions[question_id] = all_predictions[question_id] + '#' + sample[1][0]
