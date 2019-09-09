@@ -5,7 +5,7 @@ MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm
 RELOAD_MODEL_DIR="models/bert_finetuned_les_wwm/checkpoint-best"
 
 python run_les.py \
-    --cuda_devices 0 \
+    --cuda_devices 3 \
     --model_type bert \
     --model_name_or_path $RELOAD_MODEL_DIR/pytorch_model.bin \
     --config_name $MODEL_DIR/bert_config.json \
