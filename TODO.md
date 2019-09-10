@@ -3,6 +3,7 @@
 - text_cleaning.py 中计算 match score 是否考虑 para ngram ==> para ngram 效果较好，考虑了前后上下文，score=0的与supporting para重合较少，区分度高
 - 统计段落的长度分布，以及答案是否在长段落的情况，决定是否需要对长段落进行拆分
     - 段落筛选难以保证答案覆盖率
+- 存在重复问题
 
 ## bert-baseline相关
 - 训练被截断的例子的处理

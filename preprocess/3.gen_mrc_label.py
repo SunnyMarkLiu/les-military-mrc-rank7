@@ -64,11 +64,12 @@ def find_best_match_index(sub_text, doc_content):
         else:
             return best_start, best_end, best_score
 
-def gen_trainable_dataset(sample):
+def gen_trainable_dataset(sample, max_doc_len=2500):
     # 段落文本拼接成 content，以及对于的特征的合并
     for doc in sample['documents']:
         # del doc['title']; del doc['seg_title']; del doc['pos_title']; del doc['kw_title']
-        doc['content'] = ''.join(doc['paragraphs'])
+        # doc['content'] = ''.join(doc['paragraphs'])
+        doc['content'] = ''.join(doc['paragraphs'])[:max_doc_len]
         del doc['paragraphs']
         if 'supported_para_ids' in doc:
             del doc['supported_para_ids']
@@ -149,10 +150,12 @@ def gen_trainable_dataset(sample):
         sample['answer_labels'] = answer_labels
 
 if __name__ == '__main__':
+    max_doc_len = int(sys.argv[1])
+
     for line in sys.stdin:
         if not line.startswith('{'):
             continue
 
         sample = json.loads(line.strip())
-        gen_trainable_dataset(sample)
+        gen_trainable_dataset(sample, max_doc_len)
         print(json.dumps(sample, ensure_ascii=False))
