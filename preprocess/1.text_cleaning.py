@@ -105,6 +105,10 @@ def remove_by_regex(text):
 
 
 def clean_text(text, is_supporting_paragraph=False):
+    # basic cleaning according to bad case sample
+    text = text.replace('千米小时', '千米/小时')
+    text = text.replace('. ,', '.')
+
     text = remove_unicode_space(text)
     text = remove_html_tag(text)
 

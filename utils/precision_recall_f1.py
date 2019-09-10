@@ -10,6 +10,18 @@
 from collections import Counter
 
 
+def recall(prediction, ground_truth):
+    prediction_tokens = list(prediction)
+    ground_truth_tokens = list(ground_truth)
+
+    common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
+    num_same = sum(common.values())
+    if num_same == 0:
+        return 0
+    r = 1.0 * num_same / len(ground_truth_tokens)
+    return r
+
+
 def precision_recall_f1(prediction, ground_truth):
     """
     This function calculates and returns the precision, recall and f1-score
