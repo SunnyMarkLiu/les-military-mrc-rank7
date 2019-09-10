@@ -13,9 +13,9 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file $DATA_DIR/les.train.json \
-    --predict_file $DATA_DIR/les.dev.json \
-    --output_dir models/bert_finetuned_les_wwm/ \
+    --train_file $DATA_DIR/trainset/sample_aug_train_round_0.json \
+    --predict_file $DATA_DIR/devset/sample_aug_dev_round_0.json \
+    --output_dir models/data_v2_bert_wwm/ \
     --version_2_with_negative \
     --max_seq_length 512 \
     --max_query_length 64 \
