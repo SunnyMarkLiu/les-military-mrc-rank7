@@ -5,14 +5,14 @@ MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm
 RELOAD_MODEL_DIR="models/bert_finetuned_les_wwm/checkpoint-best"
 
 python run_les.py \
-    --cuda_devices 3 \
+    --cuda_devices 0 \
     --model_type bert \
     --model_name_or_path $RELOAD_MODEL_DIR/pytorch_model.bin \
     --config_name $MODEL_DIR/bert_config.json \
     --tokenizer_name $MODEL_DIR/vocab.txt \
     --do_eval \
     --do_lower_case \
-    --predict_file $DATA_DIR/les.dev.json \
+    --predict_file $DATA_DIR/dev.json \
     --output_dir $RELOAD_MODEL_DIR \
     --version_2_with_negative \
     --max_seq_length 512 \

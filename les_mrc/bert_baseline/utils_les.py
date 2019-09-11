@@ -155,8 +155,6 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                         count = 0  # 代表同一个document有多少个答案
                         for match_id, (start, end) in zip(match_doc_ids, sample['answer_labels']):
                             if doc_id != match_id: continue
-                            # TODO 临时减1
-                            end = end - 1
                             # 有些例子的start, end不在有效范围内
                             if start > end or start not in char_to_word_offset or end not in char_to_word_offset:
                                 logger.warning('{}##{}##{} has index bug'.format(sample['question_id'], doc_id, count))
@@ -245,7 +243,6 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
         '‘': "'",
         '’': "'",
         '﹪': '%',
-        'Ⅹ': 'x',
         '―': '-',
         '—': '-',
         '–': '-',

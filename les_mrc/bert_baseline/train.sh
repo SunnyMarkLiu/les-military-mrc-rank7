@@ -13,9 +13,9 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file $DATA_DIR/les.train.json \
-    --predict_file $DATA_DIR/les.dev.json \
-    --output_dir models/bert_finetuned_les_wwm/ \
+    --train_file $DATA_DIR/train.json \
+    --predict_file $DATA_DIR/dev.json \
+    --output_dir models/bert_finetuned_les_wwm \
     --version_2_with_negative \
     --max_seq_length 512 \
     --max_query_length 64 \
@@ -24,8 +24,8 @@ python run_les.py \
     --per_gpu_eval_batch_size 24 \
     --learning_rate 3e-5 \
     --warmup_steps 0 \
-    --num_train_epochs 4 \
+    --num_train_epochs 3 \
     --doc_stride 128 \
-    --logging_steps 100 \
-    --save_steps 5000 \
+    --logging_steps 200 \
+    --save_steps 4000 \
     --eval_steps 4000 \

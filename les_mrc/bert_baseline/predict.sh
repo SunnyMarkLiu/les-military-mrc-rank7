@@ -13,12 +13,12 @@ python run_les.py \
     --do_eval \
     --do_only_predict \
     --do_lower_case \
-    --predict_file $DATA_DIR/split_test_01 \
+    --predict_file $DATA_DIR/test.json \
     --output_dir $RELOAD_MODEL_DIR \
     --version_2_with_negative \
     --max_seq_length 512 \
     --max_query_length 64 \
     --max_answer_length 110 \
-    --per_gpu_eval_batch_size 48 \
+    --per_gpu_eval_batch_size 64 \
     --doc_stride 128 \
     --logging_steps 0 \
