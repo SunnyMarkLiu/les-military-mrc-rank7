@@ -22,52 +22,101 @@ def find_answer_in_docid(answer):
     docs = ans_pattern.findall(answer)
     return list(set([int(doc[-2:-1]) for doc in docs]))
 
-def find_best_match_index(sub_text, doc_content):
+def find_best_match_support_para(support_text, doc_content):
     """
-    找到 sub_text 在 content 覆盖度最大的开始和结束下标
+    利用 support text 长度的窗口滑过 doc_content，计算 rougel 最大的大致位置（粗粒度）
     """
-    if sub_text in doc_content:
+    if support_text in doc_content:
+        best_start = doc_content.index(support_text)
+        best_end = best_start + len(support_text) - 1
+        return best_start, best_end, 1
+
+    if support_text.endswith('。') and support_text[:-1] in doc_content:
+        sub_text = support_text[:-1]
         best_start = doc_content.index(sub_text)
         best_end = best_start + len(sub_text) - 1
         return best_start, best_end, 1
 
-    if sub_text.endswith('。') and sub_text[:-1] in doc_content:
-        sub_text = sub_text[:-1]
+        # 存在一些标注错误的样本，去掉空字符后才能定位
+    if support_text.replace(' ', '') in doc_content:
+        sub_text = support_text.replace(' ', '')
         best_start = doc_content.index(sub_text)
         best_end = best_start + len(sub_text) - 1
         return best_start, best_end, 1
 
-    # 存在一些标注错误的样本，去掉空字符后才能定位
-    if sub_text.replace(' ', '') in doc_content:
-        sub_text = sub_text.replace(' ', '')
-        best_start = doc_content.index(sub_text)
-        best_end = best_start + len(sub_text) - 1
-        return best_start, best_end, 1
-
-    # 不能直接定位，利用覆盖率搜索
-    support_para_chars = set(sub_text)
+    support_para_chars = set(support_text)
+    window_len = len(support_text)     # doc 和 support 不是严格的可定位
 
     best_score = 0
     best_start = -1
     best_end = -1
 
-    last_end_in_sub_text = len(doc_content) - 1
-    for start_idx in range(0, len(doc_content) - len(sub_text)):
-        if doc_content[start_idx] not in support_para_chars:
+    start = 0
+    while start < len(doc_content) - window_len - 1:
+        while doc_content[start] not in support_para_chars:
+            start += 1
+
+        end = start + window_len
+        sub_content = doc_content[start:end + 1]
+        score = RougeL().add_inst(cand=sub_content, ref=support_text).get_score()
+
+        if score > best_score:
+            best_score = score
+            best_start = start
+            best_end = end
+
+        start += 1
+
+    if best_score == 0:
+        return -1, -1, 0
+    else:
+        return best_start, best_end, best_score
+
+
+def find_best_match_answer(answer, support_para):
+    """
+    找到 sub_text 在 content 覆盖度最大的开始和结束下标（细粒度）
+    """
+    if answer in support_para:
+        best_start = support_para.index(answer)
+        best_end = best_start + len(answer) - 1
+        return best_start, best_end, 1
+
+    if answer.endswith('。') and answer[:-1] in support_para:
+        answer = answer[:-1]
+        best_start = support_para.index(answer)
+        best_end = best_start + len(answer) - 1
+        return best_start, best_end, 1
+
+    # 存在一些标注错误的样本，去掉空字符后才能定位
+    if answer.replace(' ', '') in support_para:
+        answer = answer.replace(' ', '')
+        best_start = support_para.index(answer)
+        best_end = best_start + len(answer) - 1
+        return best_start, best_end, 1
+
+    # 不能直接定位，利用覆盖率搜索
+    support_para_chars = set(answer)
+
+    best_score = 0
+    best_start = -1
+    best_end = len(support_para) - 1
+
+    for start_idx in range(0, len(support_para) - len(answer)):
+        if support_para[start_idx] not in support_para_chars:
             continue
 
-        for end_idx in range(last_end_in_sub_text, start_idx - 1, -1):
-            if doc_content[end_idx] not in support_para_chars:
+        for end_idx in range(best_end, start_idx - 1, -1):
+            if support_para[end_idx] not in support_para_chars:
                 continue
 
-            sub_para_content = doc_content[start_idx: end_idx + 1]
-            score = RougeL().add_inst(cand=sub_para_content, ref=sub_text).get_score()
+            sub_para_content = support_para[start_idx: end_idx + 1]
+            score = RougeL().add_inst(cand=sub_para_content, ref=answer).get_score()
 
             if score > best_score:
                 best_score = score
                 best_start = start_idx
                 best_end = end_idx
-                last_end_in_sub_text = end_idx
 
     if best_score == 0:
         return -1, -1, 0
@@ -108,7 +157,7 @@ def gen_mrc_dataset(sample):
         for para_str in para_strs:
             if para_str != '' and '@content' not in para_str:
                 para_str = para_str.replace('content{}@'.format(sup_para_in_docid), '')
-                sup_start, sup_end, rougel = find_best_match_index(para_str, sample['documents'][sup_para_in_docid - 1]['content'])
+                sup_start, sup_end, rougel = find_best_match_support_para(para_str, sample['documents'][sup_para_in_docid - 1]['content'])
                 found_sup_para = sample['documents'][sup_para_in_docid - 1]['content'][sup_start: sup_end + 1]
                 # 同一个 doc 可能出现多个support para
                 if sup_para_in_docid in supported_paras:
@@ -141,7 +190,7 @@ def gen_mrc_dataset(sample):
                 best_end_in_sup_para = -1
                 best_sup_para_i = None
                 for sup_para_i, doc_support_para in enumerate(doc_support_paras):
-                    start_in_sup_para, end_in_sup_para, rougel = find_best_match_index(answer_str, doc_support_para[0])
+                    start_in_sup_para, end_in_sup_para, rougel = find_best_match_answer(answer_str, doc_support_para[0])
                     if rougel > max_rougel:
                         max_rougel = rougel
                         best_start_in_sup_para = start_in_sup_para
