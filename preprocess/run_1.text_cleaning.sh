@@ -14,7 +14,25 @@ nohup cat ${source_dir}split_train_06 |python 1.text_cleaning.py > ${target_dir}
 nohup cat ${source_dir}split_train_07 |python 1.text_cleaning.py > ${target_dir}split_train_07 2>&1 &
 nohup cat ${source_dir}split_train_08 |python 1.text_cleaning.py > ${target_dir}split_train_08 2>&1 &
 nohup cat ${source_dir}split_train_09 |python 1.text_cleaning.py > ${target_dir}split_train_09 2>&1 &
+nohup cat ${source_dir}split_train_10 |python 1.text_cleaning.py > ${target_dir}split_train_10 2>&1 &
+nohup cat ${source_dir}split_train_11 |python 1.text_cleaning.py > ${target_dir}split_train_11 2>&1 &
+nohup cat ${source_dir}split_train_12 |python 1.text_cleaning.py > ${target_dir}split_train_12 2>&1 &
+nohup cat ${source_dir}split_train_13 |python 1.text_cleaning.py > ${target_dir}split_train_13 2>&1 &
+nohup cat ${source_dir}split_train_14 |python 1.text_cleaning.py > ${target_dir}split_train_14 2>&1 &
+nohup cat ${source_dir}split_train_15 |python 1.text_cleaning.py > ${target_dir}split_train_15 2>&1 &
+nohup cat ${source_dir}split_train_16 |python 1.text_cleaning.py > ${target_dir}split_train_16 2>&1 &
+nohup cat ${source_dir}split_train_17 |python 1.text_cleaning.py > ${target_dir}split_train_17 2>&1 &
+nohup cat ${source_dir}split_train_18 |python 1.text_cleaning.py > ${target_dir}split_train_18 2>&1 &
+nohup cat ${source_dir}split_train_19 |python 1.text_cleaning.py > ${target_dir}split_train_19 2>&1 &
+nohup cat ${source_dir}split_train_20 |python 1.text_cleaning.py > ${target_dir}split_train_20 2>&1 &
+nohup cat ${source_dir}split_train_21 |python 1.text_cleaning.py > ${target_dir}split_train_21 2>&1 &
+nohup cat ${source_dir}split_train_22 |python 1.text_cleaning.py > ${target_dir}split_train_22 2>&1 &
+nohup cat ${source_dir}split_train_23 |python 1.text_cleaning.py > ${target_dir}split_train_23 2>&1 &
+nohup cat ${source_dir}split_train_24 |python 1.text_cleaning.py > ${target_dir}split_train_24 2>&1 &
 
 echo "cleaning test data..."
 nohup cat ${source_dir}split_test_00 |python 1.text_cleaning.py > ${target_dir}split_test_00 2>&1 &
 nohup cat ${source_dir}split_test_01 |python 1.text_cleaning.py > ${target_dir}split_test_01 2>&1 &
+nohup cat ${source_dir}split_test_02 |python 1.text_cleaning.py > ${target_dir}split_test_02 2>&1 &
+nohup cat ${source_dir}split_test_03 |python 1.text_cleaning.py > ${target_dir}split_test_03 2>&1 &
+nohup cat ${source_dir}split_test_04 |python 1.text_cleaning.py > ${target_dir}split_test_04 2>&1 &

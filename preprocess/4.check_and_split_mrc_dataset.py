@@ -14,7 +14,7 @@ import re
 import json
 import copy
 import random
-from utils.bleu import Bleu
+from utils.rouge import RougeL
 
 ans_pattern = re.compile(r'@content\d@')
 
@@ -33,7 +33,7 @@ def calc_ceil_rougel(answer_text, sample):
     if len(fake_answers) == 0:
         sample['ceil_rougel'] = 0
     else:
-        ceil_rougel = Bleu().add_inst(cand=''.join(fake_answers), ref=answer_text).get_score()
+        ceil_rougel = RougeL().add_inst(cand=''.join(fake_answers), ref=answer_text).get_score()
         sample['ceil_rougel'] = ceil_rougel
 
 

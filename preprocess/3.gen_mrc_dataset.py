@@ -12,7 +12,8 @@ import sys
 sys.path.append('../')
 import re
 import json
-from utils.bleu import Bleu
+from utils.rouge import RougeL
+
 
 ans_pattern = re.compile(r'@content\d@')
 
@@ -29,69 +30,74 @@ def find_best_match_index(sub_text, doc_content):
         best_start = doc_content.index(sub_text)
         best_end = best_start + len(sub_text) - 1
         return best_start, best_end, 1
-    elif sub_text.endswith('。') and sub_text[:-1] in doc_content:
-        best_start = doc_content.index(sub_text[:-1])
+
+    if sub_text.endswith('。') and sub_text[:-1] in doc_content:
+        sub_text = sub_text[:-1]
+        best_start = doc_content.index(sub_text)
         best_end = best_start + len(sub_text) - 1
         return best_start, best_end, 1
-    else:
-        # 不能直接定位，利用覆盖率搜索
-        support_para_chars = set(sub_text)
 
-        best_score = 0
-        best_start = -1
-        best_end = -1
+    # 存在一些标注错误的样本，去掉空字符后才能定位
+    if sub_text.replace(' ', '') in doc_content:
+        sub_text = sub_text.replace(' ', '')
+        best_start = doc_content.index(sub_text)
+        best_end = best_start + len(sub_text) - 1
+        return best_start, best_end, 1
 
-        last_end_in_sub_text = len(doc_content) - 1
-        for start_idx in range(0, len(doc_content) - len(sub_text)):
-            if doc_content[start_idx] not in support_para_chars:
+    # 不能直接定位，利用覆盖率搜索
+    support_para_chars = set(sub_text)
+
+    best_score = 0
+    best_start = -1
+    best_end = -1
+
+    last_end_in_sub_text = len(doc_content) - 1
+    for start_idx in range(0, len(doc_content) - len(sub_text)):
+        if doc_content[start_idx] not in support_para_chars:
+            continue
+
+        for end_idx in range(last_end_in_sub_text, start_idx - 1, -1):
+            if doc_content[end_idx] not in support_para_chars:
                 continue
 
-            for end_idx in range(last_end_in_sub_text, start_idx - 1, -1):
-                if doc_content[end_idx] not in support_para_chars:
-                    continue
+            sub_para_content = doc_content[start_idx: end_idx + 1]
+            score = RougeL().add_inst(cand=sub_para_content, ref=sub_text).get_score()
 
-                sub_para_content = doc_content[start_idx: end_idx + 1]
-                score = Bleu().add_inst(cand=sub_para_content, ref=sub_text).get_score()
+            if score > best_score:
+                best_score = score
+                best_start = start_idx
+                best_end = end_idx
+                last_end_in_sub_text = end_idx
 
-                if score > best_score:
-                    best_score = score
-                    best_start = start_idx
-                    best_end = end_idx
-                    last_end_in_sub_text = end_idx
+    if best_score == 0:
+        return -1, -1, 0
+    else:
+        return best_start, best_end, best_score
 
-        if best_score == 0:
-            return -1, -1, 0
-        else:
-            return best_start, best_end, best_score
+def calc_ceil_rougel(answer_text, sample):
+    # 计算抽取的 fake answer 以及对应的 ceil rougel
+    fake_answers = [sample['documents'][answer_label[0]]['content'][answer_label[1]: answer_label[2] + 1]
+                    for answer_label in sample['answer_labels']]
+    sample['fake_answers'] = fake_answers
 
-def gen_trainable_dataset(sample, max_doc_len=2500):
+    if len(fake_answers) == 0:
+        sample['ceil_rougel'] = 0
+    else:
+        ceil_rougel = RougeL().add_inst(cand=''.join(fake_answers), ref=answer_text).get_score()
+        sample['ceil_rougel'] = ceil_rougel
+
+def gen_mrc_dataset(sample):
+    """
+    生成全文本下的 MRC 数据集
+    """
     # 段落文本拼接成 content，以及对于的特征的合并
-    for doc in sample['documents']:
-        # del doc['title']; del doc['seg_title']; del doc['pos_title']; del doc['kw_title']
-        # doc['content'] = ''.join(doc['paragraphs'])
-        doc['content'] = ''.join(doc['paragraphs'])[:max_doc_len]
+    for doc_id, doc in enumerate(sample['documents']):
+        doc['content'] = ''.join(doc['paragraphs'])
         del doc['paragraphs']
-        if 'supported_para_ids' in doc:
-            del doc['supported_para_ids']
-
-        # doc['seg'] = [item for sublist in doc['seg'] for item in sublist]
-        # doc['term_pos'] = [item for sublist in doc['term_pos'] for item in sublist]
-        # doc['term_kw'] = [item for sublist in doc['term_kw'] for item in sublist]
-        # doc['term_entity'] = [item for sublist in doc['term_entity'] for item in sublist]
-        # doc['term_in_que'] = [item for sublist in doc['term_in_que'] for item in sublist]
-        # doc['char_pos'] = [item for sublist in doc['char_pos'] for item in sublist]
-        # doc['char_kw'] = [item for sublist in doc['char_kw'] for item in sublist]
-        # doc['char_entity'] = [item for sublist in doc['char_entity'] for item in sublist]
-        # doc['char_in_que'] = [item for sublist in doc['char_in_que'] for item in sublist]
 
     # 对训练集定位答案的 start end 下标
     if 'answer' not in sample:
         return
-
-    # 修复清洗过程 @content@@content@ 被破坏的 bug
-    sample['supporting_paragraph'] = sample['supporting_paragraph'].replace('@content1@content', '@content1@@content'). \
-        replace('@content2@content', '@content2@@content').replace('@content3@content', '@content3@@content'). \
-        replace('@content4@content', '@content4@@content').replace('@content5@content', '@content5@@content')
 
     # 根据 support paragraph 找到答案所在的 sub para
     support_para_in_docids = find_answer_in_docid(sample['supporting_paragraph'])
@@ -148,14 +154,16 @@ def gen_trainable_dataset(sample, max_doc_len=2500):
                     answer_labels.append((ans_in_docid - 1, start_label, end_label))
 
         sample['answer_labels'] = answer_labels
+        answer_text = ''.join(answer_texts)
+        calc_ceil_rougel(answer_text, sample)
+
 
 if __name__ == '__main__':
-    max_doc_len = int(sys.argv[1])
-
     for line in sys.stdin:
         if not line.startswith('{'):
             continue
 
-        sample = json.loads(line.strip())
-        gen_trainable_dataset(sample, max_doc_len)
-        print(json.dumps(sample, ensure_ascii=False))
+        json_sample = json.loads(line.strip())
+
+        gen_mrc_dataset(json_sample)
+        print(json.dumps(json_sample, ensure_ascii=False))

@@ -117,6 +117,9 @@ def clean_text(text, is_supporting_paragraph=False):
 
     text = clean_duplacte_chars(text)
     text = remove_by_regex(text)
+
+    # 去除空格, 790个样本的答案中包含空格，占比 0.3 %
+    text = text.replace(' ', '')
     return text
 
 
