@@ -65,7 +65,7 @@ if __name__ == '__main__':
         sup_para_in_docids = find_answer_in_docid(sample['supporting_paragraph'])
         for docid in sup_para_in_docids:
             flag_str = '@content{}@'.format(docid)
-            sup_para_strs = sample['answer'].split('@content{}@'.format(docid))
+            sup_para_strs = sample['supporting_paragraph'].split('@content{}@'.format(docid))
             for sup_para_str in sup_para_strs:
                 sup_para_str = sup_para_str.strip()  # important
                 # @content1@ 包裹的实际答案文本
@@ -81,4 +81,5 @@ if __name__ == '__main__':
 
         del sample['fake_answers']
         del sample['ceil_rougel']
+        del sample['answer_labels']
         print(json.dumps(sample, ensure_ascii=False))

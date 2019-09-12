@@ -141,6 +141,7 @@ def gen_mrc_dataset(sample):
     """
     # 段落文本拼接成 content，以及对于的特征的合并
     for doc_id, doc in enumerate(sample['documents']):
+        if 'content' in doc: continue
         doc['content'] = ''.join(doc['paragraphs'])
         del doc['paragraphs']
 
