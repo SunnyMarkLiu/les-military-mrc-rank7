@@ -86,6 +86,7 @@ class InputFeatures(object):
                  input_ids,
                  input_mask,
                  segment_ids,
+                 input_span_mask,
                  cls_index,
                  p_mask,
                  paragraph_len,
@@ -101,6 +102,7 @@ class InputFeatures(object):
         self.input_ids = input_ids
         self.input_mask = input_mask
         self.segment_ids = segment_ids
+        self.input_span_mask = input_span_mask
         self.cls_index = cls_index
         self.p_mask = p_mask
         self.paragraph_len = paragraph_len
@@ -263,11 +265,27 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
         # if example_index % 100 == 0:
         #     logger.info('Converting %s/%s pos %s neg %s', example_index, len(examples), cnt_pos, cnt_neg)
 
+        # question_text = example.question_text
+        # for key, value in convert_token_list.items():
+        #     question_text = question_text.replace(key, value)
+        # # TODO 这样似乎question中的英文没分开,也许会有问题
+        # query_tokens = tokenizer.tokenize(question_text)
         question_text = example.question_text
-        for key, value in convert_token_list.items():
-            question_text = question_text.replace(key, value)
-        # TODO 这样似乎question中的英文没分开,也许会有问题
-        query_tokens = tokenizer.tokenize(question_text)
+        query_tokens = []
+        for token in question_text:
+            if token in convert_token_list:
+                sub_tokens = [convert_token_list[token]]
+            else:
+                sub_tokens = tokenizer.tokenize(token)
+                if '[UNK]' in sub_tokens:
+                    unk_tokens_dict[token] += 1
+                if len(sub_tokens) == 0:
+                    skipped_tokens_dict[token] += 1
+                    sub_tokens = [convert_token_list['[SKIPPED]']]  # 为了保持长度不变
+            for sub_token in sub_tokens:
+                query_tokens.append(sub_token)
+
+        assert len(question_text) == len(query_tokens)
 
         if len(query_tokens) > max_query_length:
             query_tokens = query_tokens[0:max_query_length]
@@ -338,6 +356,9 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
             token_is_max_context = {}
             segment_ids = []
 
+            # 借鉴CMRC2018
+            input_span_mask = []
+
             # p_mask: mask with 1 for token than cannot be in the answer (0 for token which can be in an answer)
             # Original TF implem also keep the classification token (set to 0) (not sure why...)
             p_mask = []
@@ -347,6 +368,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 tokens.append(cls_token)
                 segment_ids.append(cls_token_segment_id)
                 p_mask.append(0)
+                input_span_mask.append(1)
                 cls_index = 0
 
             # Query
@@ -354,11 +376,13 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 tokens.append(token)
                 segment_ids.append(sequence_a_segment_id)
                 p_mask.append(1)
+                input_span_mask.append(0)
 
             # SEP token
             tokens.append(sep_token)
             segment_ids.append(sequence_a_segment_id)
             p_mask.append(1)
+            input_span_mask.append(0)
 
             # Paragraph
             for i in range(doc_span.length):
@@ -371,18 +395,21 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 tokens.append(all_doc_tokens[split_token_index])
                 segment_ids.append(sequence_b_segment_id)
                 p_mask.append(0)
+                input_span_mask.append(1)
             paragraph_len = doc_span.length
 
             # SEP token
             tokens.append(sep_token)
             segment_ids.append(sequence_b_segment_id)
             p_mask.append(1)
+            input_span_mask.append(0)
 
             # CLS token at the end
             if cls_token_at_end:
                 tokens.append(cls_token)
                 segment_ids.append(cls_token_segment_id)
                 p_mask.append(0)
+                input_span_mask.append(1)
                 cls_index = len(tokens) - 1  # Index of classification token
 
             input_ids = tokenizer.convert_tokens_to_ids(tokens)
@@ -397,10 +424,12 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 input_mask.append(0 if mask_padding_with_zero else 1)
                 segment_ids.append(pad_token_segment_id)
                 p_mask.append(1)
+                input_span_mask.append(0)
 
             assert len(input_ids) == max_seq_length
             assert len(input_mask) == max_seq_length
             assert len(segment_ids) == max_seq_length
+            assert len(input_span_mask) == max_seq_length
 
             span_is_impossible = example.is_impossible
             start_position = None
@@ -444,6 +473,8 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                     "input_mask: %s" % " ".join([str(x) for x in input_mask]))
                 logger.info(
                     "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+                logger.info(
+                    "input_span_mask: %s" % " ".join([str(x) for x in input_span_mask]))
                 if is_training and span_is_impossible:
                     logger.info("impossible example")
                 if is_training and not span_is_impossible:
@@ -464,6 +495,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                     input_ids=input_ids,
                     input_mask=input_mask,
                     segment_ids=segment_ids,
+                    input_span_mask=input_span_mask,
                     cls_index=cls_index,
                     p_mask=p_mask,
                     paragraph_len=paragraph_len,

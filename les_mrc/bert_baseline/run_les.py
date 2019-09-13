@@ -50,6 +50,8 @@ from utils_les import (read_squad_examples, convert_examples_to_features,
 # We've added it here for automated tests (see examples/test_examples.py file)
 from utils_les_evaluate import evaluate_on_les
 
+from les_modeling import BertForLes
+
 logger = logging.getLogger(__name__)
 
 ALL_MODELS = sum((tuple(conf.pretrained_config_archive_map.keys()) \
@@ -140,6 +142,10 @@ def train(args, train_dataset, model, tokenizer):
             if args.model_type in ['xlnet', 'xlm']:
                 inputs.update({'cls_index': batch[5],
                                'p_mask':       batch[6]})
+
+            # TODO 这里增加一些特征, 注意batch[index]正确对应
+            inputs.update({'input_span_mask': batch[7]})
+
             outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in pytorch-transformers (see doc)
 
@@ -242,6 +248,10 @@ def evaluate(args, model, tokenizer, prefix="les"):
             if args.model_type in ['xlnet', 'xlm']:
                 inputs.update({'cls_index': batch[4],
                                'p_mask':    batch[5]})
+
+            # TODO 这里增加一些特征, 注意batch[index]正确对应
+            inputs.update({'input_span_mask': batch[6]})
+
             outputs = model(**inputs)
 
         for i, example_index in enumerate(example_indices):
@@ -347,21 +357,23 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
         torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
 
     # Convert to Tensors and build dataset
+    # TODO 这里会加一些特征
     all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
     all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
     all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+    all_input_span_mask = torch.tensor([f.input_span_mask for f in features], dtype=torch.long)
     if evaluate:
         all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
         dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
-                                all_example_index, all_cls_index, all_p_mask)
+                                all_example_index, all_cls_index, all_p_mask, all_input_span_mask)
     else:
         all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
         all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
         dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
                                 all_start_positions, all_end_positions,
-                                all_cls_index, all_p_mask)
+                                all_cls_index, all_p_mask, all_input_span_mask)
 
     if output_examples:
         return dataset, examples, features
@@ -378,6 +390,8 @@ def main():
                         help="SQuAD json for predictions. E.g., dev-v1.1.json or test-v1.1.json")
     parser.add_argument("--model_type", default=None, type=str, required=True,
                         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
+    parser.add_argument("--customer_model_class", default=None, type=str, required=True,
+                        help="Model class we may override the bert QAModel")
     parser.add_argument("--model_name_or_path", default=None, type=str, required=True,
                         help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(ALL_MODELS))
     parser.add_argument("--output_dir", default=None, type=str, required=True,
@@ -518,6 +532,16 @@ def main():
 
     args.model_type = args.model_type.lower()
     config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+
+    # 重新载入自己想要的模型类
+    if args.customer_model_class.lower() == 'bert':
+        pass
+    elif args.customer_model_class.lower() == 'BertForLes'.lower():
+        model_class = BertForLes
+        logger.warning('We load customer model `{}`, rather than normal bert model'.format(model_class.__name__))
+    else:
+        raise NotImplementedError('We have not implemented the {} model class'.format(args.customer_model_class))
+
     config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path)
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name if args.tokenizer_name else args.model_name_or_path, do_lower_case=args.do_lower_case)
     model = model_class.from_pretrained(args.model_name_or_path, from_tf=bool('.ckpt' in args.model_name_or_path), config=config)
@@ -573,6 +597,9 @@ def main():
             global_step = checkpoint.split('-')[-1] if len(checkpoints) > 1 else ""
             model = model_class.from_pretrained(checkpoint)
             model.to(args.device)
+
+            if args.n_gpu > 1:
+                model = torch.nn.DataParallel(model)
 
             # Evaluate
             result = evaluate(args, model, tokenizer, prefix=global_step if global_step else 'checkpoint')
