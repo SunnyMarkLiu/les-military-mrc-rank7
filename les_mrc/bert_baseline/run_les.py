@@ -88,6 +88,11 @@ def train(args, train_dataset, model, tokenizer):
     else:
         t_total = len(train_dataloader) // args.gradient_accumulation_steps * args.num_train_epochs
 
+    if args.warmup_proportion > 0.0:
+        args.warmup_steps = int(args.warmup_proportion * t_total) + 1
+        logger.warning('Warmup proportion covered warmup steps, final proportion: {}, final steps: {}'.format(
+            args.warmup_proportion, args.warmup_steps))
+
     # Prepare optimizer and schedule (linear warmup and decay)
     no_decay = ['bias', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
@@ -453,6 +458,8 @@ def main():
                         help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
     parser.add_argument("--warmup_steps", default=0, type=int,
                         help="Linear warmup over warmup_steps.")
+    parser.add_argument("--warmup_proportion", default=0, type=float,
+                        help="Linear warmup proportion, it will cover warmup_steps if > 0.")
     parser.add_argument("--n_best_size", default=20, type=int,
                         help="The total number of n-best predictions to generate in the nbest_predictions.json output file.")
     parser.add_argument("--max_answer_length", default=30, type=int,
