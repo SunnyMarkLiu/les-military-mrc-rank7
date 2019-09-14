@@ -4,7 +4,7 @@ DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/mrc_dat
 MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
 
 python run_les.py \
-    --cuda_devices 0,1,3 \
+    --cuda_devices 0,1,2 \
     --model_type bert \
     --customer_model_class BertForLes \
     --model_name_or_path $MODEL_DIR/pytorch_model.bin \

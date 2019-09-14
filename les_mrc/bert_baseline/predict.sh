@@ -2,10 +2,10 @@
 set -ex
 DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/mrc_dataset_question_split"
 MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
-RELOAD_MODEL_DIR="models/les_wwm_ques_split_span_mask/checkpoint-best"
+RELOAD_MODEL_DIR="models/les_wwm_ques_split_span_mask"
 
 python run_les.py \
-    --cuda_devices 2 \
+    --cuda_devices 0 \
     --model_type bert \
     --customer_model_class BertForLes \
     --model_name_or_path $RELOAD_MODEL_DIR/pytorch_model.bin \

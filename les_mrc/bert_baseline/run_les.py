@@ -50,7 +50,7 @@ from utils_les import (read_squad_examples, convert_examples_to_features,
 # We've added it here for automated tests (see examples/test_examples.py file)
 from utils_les_evaluate import evaluate_on_les
 
-from les_modeling import BertForLes
+from les_modeling import BertForLes, LesAnswerVerification
 
 logger = logging.getLogger(__name__)
 
@@ -545,6 +545,9 @@ def main():
         pass
     elif args.customer_model_class.lower() == 'BertForLes'.lower():
         model_class = BertForLes
+        logger.warning('We load customer model `{}`, rather than normal bert model'.format(model_class.__name__))
+    elif args.customer_model_class.lower() == 'LesAnswerVerification'.lower():
+        model_class = LesAnswerVerification
         logger.warning('We load customer model `{}`, rather than normal bert model'.format(model_class.__name__))
     else:
         raise NotImplementedError('We have not implemented the {} model class'.format(args.customer_model_class))
