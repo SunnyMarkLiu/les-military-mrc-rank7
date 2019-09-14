@@ -68,7 +68,8 @@ class LesAnswerVerification(BertPreTrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
-                end_positions=None, position_ids=None, head_mask=None):
+                end_positions=None, position_ids=None, head_mask=None,
+                input_span_mask=None):
         outputs = self.bert(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
                             attention_mask=attention_mask, head_mask=head_mask)
         sequence_output = outputs[0]
@@ -81,13 +82,24 @@ class LesAnswerVerification(BertPreTrainedModel):
         rationale_logits = self.retionale_outputs(sequence_output_matrix)  # (B*L,1)
         rationale_logits = torch.sigmoid(rationale_logits)  # (B*L,1)
         rationale_logits = rationale_logits.view(batch_size, seq_length)  # (B,L)
-        final_hidden = sequence_output * rationale_logits.unsqueeze(2)
-        sequence_output = final_hidden.view(batch_size * seq_length, hidden_size)  # (B*L,H)
+        final_hidden = sequence_output * rationale_logits.unsqueeze(2)  # (B,L,H)
+        # sequence_output = final_hidden.view(batch_size * seq_length, hidden_size)  # (B*L,H)
+        sequence_output = final_hidden
 
         logits = self.qa_outputs(sequence_output)
         start_logits, end_logits = logits.split(1, dim=-1)
         start_logits = start_logits.squeeze(-1)
         end_logits = end_logits.squeeze(-1)
+
+        # 增加rationale gate
+        rationale_logits = rationale_logits * attention_mask.float()
+        start_logits = start_logits * rationale_logits
+        end_logits = end_logits * rationale_logits
+
+        # 增加input_span_mask, 这里为None时会报错(防止特征没有load)
+        adder = (1.0 - input_span_mask.float()) * -10000.0
+        start_logits += adder
+        end_logits += adder
 
         outputs = (start_logits, end_logits,) + outputs[2:]
         if start_positions is not None and end_positions is not None:
@@ -100,6 +112,14 @@ class LesAnswerVerification(BertPreTrainedModel):
             ignored_index = start_logits.size(1)
             start_positions.clamp_(0, ignored_index)
             end_positions.clamp_(0, ignored_index)
+
+            # rationale_positions = token_type_ids.float()
+            # alpha = 0.25
+            # gamma = 2.
+            # rationale_loss = -alpha * ((1 - rationale_logits) ** gamma) * rationale_positions * torch.log(
+            #     rationale_logits + 1e-8) - (1 - alpha) * (rationale_logits ** gamma) * (
+            #     1 - rationale_positions) * torch.log(1 - rationale_logits + 1e-8)
+            # rationale_loss = (rationale_loss * token_type_ids.float()).sum() / token_type_ids.float().sum()
 
             loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
             start_loss = loss_fct(start_logits, start_positions)

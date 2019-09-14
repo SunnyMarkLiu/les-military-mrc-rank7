@@ -14,8 +14,8 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file $DATA_DIR/head200.json \
-    --predict_file $DATA_DIR/head200.json \
+    --train_file $DATA_DIR/train_max_content_len_1000.json \
+    --predict_file $DATA_DIR/dev.json \
     --output_dir models/les_wwm_ques_split_span_mask \
     --version_2_with_negative \
     --max_seq_length 512 \
