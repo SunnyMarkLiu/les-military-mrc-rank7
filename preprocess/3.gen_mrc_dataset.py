@@ -12,6 +12,7 @@ import sys
 sys.path.append('../')
 import re
 import json
+import numpy as np
 from utils.rouge import RougeL
 
 
@@ -145,6 +146,9 @@ def gen_mrc_dataset(sample):
         doc['content'] = ''.join(doc['paragraphs'])
         del doc['paragraphs']
 
+        if 'supported_para_ids' in doc:
+            del doc['supported_para_ids']
+
     # 对训练集定位答案的 start end 下标
     if 'answer' not in sample:
         return
@@ -175,6 +179,14 @@ def gen_mrc_dataset(sample):
         # 找到当前 doc 的支撑para信息，这些para中可能包含答案
         doc_support_paras = supported_paras[ans_in_docid]   # [{'找到的最匹配的 support para', '最匹配的开始下标', '最匹配的结束下标'}]
 
+        # docid 的 support para mask
+        doc_sup_mask = np.array([0] * len(sample['documents'][ans_in_docid - 1]['content']))
+        for doc_support_para in doc_support_paras:
+            sup_start, sup_end = doc_support_para[1], doc_support_para[2]
+            doc_sup_mask[sup_start: sup_end + 1] = 1
+
+        # 答案所在 support para 对应的 mask 向量
+        sample['documents'][ans_in_docid - 1]['supported_para_mask'] = doc_sup_mask.tolist()
         # IMPORTANT:
         # 答案几乎都在 supporting_paragraph 中，所以进行答案定位的时候，需要先根据 supporting_paragraph 缩小答案的搜索范围，
         # 再在其中定位答案的实际开始和结束的下标，同时需要注意加上 supporting_paragraph 搜索下标的偏移 shifted_start
