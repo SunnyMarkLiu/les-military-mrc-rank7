@@ -96,9 +96,21 @@ def sample_train_content(sample, max_train_content_len, min_left_context_len=100
                 doc['content'] = doc['content'][:max_train_content_len]
                 doc['supported_para_mask'] = doc['supported_para_mask'][:max_train_content_len]
             # 右边 context 的长度稍短，答案从后面截断在后面的 max_train_content_len 内
-            elif len(doc['content']) - start <= max_train_content_len - min_left_context_len:
+            elif len(doc['content']) - start + min_left_context_len <= max_train_content_len:
+                new_ans_start_idx = start - (len(doc['content']) - max_train_content_len)
+                new_ans_end_idx = new_ans_start_idx + (end - start)
+
                 doc['content'] = doc['content'][-max_train_content_len:]
                 doc['supported_para_mask'] = doc['supported_para_mask'][-max_train_content_len:]
+
+                # 更新答案下标
+                answer_labels = []
+                for al in sample['answer_labels']:
+                    if doc_id == al[0]:
+                        answer_labels.append((doc_id, new_ans_start_idx, new_ans_end_idx))
+                    else:
+                        answer_labels.append(al)
+                sample['answer_labels'] = answer_labels
             # 左边右边的长度都比较长，则以答案为基本中心进行截断
             else:
                 cut_doc_where_answer_in(sample, doc_id, answer_in_docs, max_train_content_len,
