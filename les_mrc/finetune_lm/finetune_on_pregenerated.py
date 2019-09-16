@@ -141,45 +141,19 @@ def main():
                         help="Store training data as on-disc memmaps to massively reduce memory usage")
 
     parser.add_argument("--epochs", type=int, default=3, help="Number of epochs to train for")
-    parser.add_argument("--local_rank",
-                        type=int,
-                        default=-1,
-                        help="local_rank for distributed training on gpus")
-    parser.add_argument("--no_cuda",
-                        action='store_true',
-                        help="Whether not to use CUDA when available")
-    parser.add_argument('--gradient_accumulation_steps',
-                        type=int,
-                        default=1,
-                        help="Number of updates steps to accumulate before performing a backward/update pass.")
-    parser.add_argument("--train_batch_size",
-                        default=32,
-                        type=int,
-                        help="Total batch size for training.")
-    parser.add_argument('--fp16',
-                        action='store_true',
-                        help="Whether to use 16-bit float precision instead of 32-bit")
-    parser.add_argument('--loss_scale',
-                        type=float, default=0,
+    parser.add_argument("--local_rank", type=int, default=-1, help="local_rank for distributed training on gpus")
+    parser.add_argument("--no_cuda", action='store_true', help="Whether not to use CUDA when available")
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=1, help="Number of updates steps to accumulate before performing a backward/update pass.")
+    parser.add_argument("--train_batch_size", default=32, type=int, help="Total batch size for training.")
+    parser.add_argument('--fp16', action='store_true', help="Whether to use 16-bit float precision instead of 32-bit")
+    parser.add_argument('--loss_scale', type=float, default=0,
                         help="Loss scaling to improve fp16 numeric stability. Only used when fp16 set to True.\n"
                         "0 (default value): dynamic loss scaling.\n"
                         "Positive power of 2: static loss scaling value.\n")
-    parser.add_argument("--warmup_steps",
-                        default=0,
-                        type=int,
-                        help="Linear warmup over warmup_steps.")
-    parser.add_argument("--adam_epsilon",
-                        default=1e-8,
-                        type=float,
-                        help="Epsilon for Adam optimizer.")
-    parser.add_argument("--learning_rate",
-                        default=3e-5,
-                        type=float,
-                        help="The initial learning rate for Adam.")
-    parser.add_argument('--seed',
-                        type=int,
-                        default=42,
-                        help="random seed for initialization")
+    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
+    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
+    parser.add_argument("--learning_rate", default=3e-5, type=float, help="The initial learning rate for Adam.")
+    parser.add_argument('--seed', type=int, default=42, help="random seed for initialization")
     args = parser.parse_args()
 
     assert args.pregenerated_data.is_dir(), \

@@ -4,6 +4,8 @@ import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from pytorch_transformers import BertPreTrainedModel, BertModel
 
+VERY_NEGATIVE_NUMBER = -1e29
+
 
 class BertForLes(BertPreTrainedModel):
     def __init__(self, config):
@@ -28,7 +30,7 @@ class BertForLes(BertPreTrainedModel):
         end_logits = end_logits.squeeze(-1)
 
         # 增加input_span_mask, 这里为None时会报错(防止特征没有load)
-        adder = (1.0 - input_span_mask.float()) * -10000.0
+        adder = (1.0 - input_span_mask.float()) * VERY_NEGATIVE_NUMBER
         start_logits += adder
         end_logits += adder
 
@@ -97,7 +99,7 @@ class LesAnswerVerification(BertPreTrainedModel):
         end_logits = end_logits * rationale_logits
 
         # 增加input_span_mask, 这里为None时会报错(防止特征没有load)
-        adder = (1.0 - input_span_mask.float()) * -10000.0
+        adder = (1.0 - input_span_mask.float()) * VERY_NEGATIVE_NUMBER
         start_logits += adder
         end_logits += adder
 

@@ -76,7 +76,7 @@ def to_list(tensor):
 def train(args, train_dataset, model, tokenizer):
     """ Train the model """
     if args.local_rank in [-1, 0]:
-        tb_writer = SummaryWriter()
+        tb_writer = SummaryWriter(comment=args.comment)
 
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 else DistributedSampler(train_dataset)
@@ -402,11 +402,14 @@ def main():
     parser.add_argument("--output_dir", default=None, type=str, required=True,
                         help="The output directory where the model checkpoints and predictions will be written.")
 
-    ## 设置需要使用的GPU编号
+    # 设置需要使用的GPU编号
     parser.add_argument("--cuda_devices", default=None, type=str, required=True,
                         help="set which gpu(s) will be use, e.g. '0,2,3'.")
 
-    ## Other parameters
+    # 当前实验配置描述信息
+    parser.add_argument('--comment', type=str, default='', help='the comment of current model training')
+
+    # Other parameters
     parser.add_argument("--config_name", default="", type=str,
                         help="Pretrained config name or path if not the same as model_name")
     parser.add_argument("--tokenizer_name", default="", type=str,
