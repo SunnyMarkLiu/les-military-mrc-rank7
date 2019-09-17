@@ -4,6 +4,10 @@ import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from pytorch_transformers import BertPreTrainedModel, BertModel
 
+import sys
+sys.path.append('..')
+from nn.layers import Highway
+
 VERY_NEGATIVE_NUMBER = -1e29
 
 
@@ -53,6 +57,131 @@ class BertForLes(BertPreTrainedModel):
             outputs = (total_loss,) + outputs
 
         return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+
+
+class LesBertHighway(BertPreTrainedModel):
+    def __init__(self, config):
+        super(LesBertHighway, self).__init__(config)
+        self.num_labels = config.num_labels
+
+        self.bert = BertModel(config)
+        self.highway = Highway(input_dim=config.hidden_size, num_layers=2)  # 增加highway层
+        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
+                end_positions=None, position_ids=None, head_mask=None,
+                input_span_mask=None):
+        outputs = self.bert(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
+                            attention_mask=attention_mask, head_mask=head_mask)
+        sequence_output = outputs[0]
+
+        # 增加highway层
+        sequence_output = self.highway(sequence_output)
+
+        logits = self.qa_outputs(sequence_output)
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
+
+        # 增加input_span_mask, 这里为None时会报错(防止特征没有load)
+        adder = (1.0 - input_span_mask.float()) * VERY_NEGATIVE_NUMBER
+        start_logits += adder
+        end_logits += adder
+
+        outputs = (start_logits, end_logits,) + outputs[2:]
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.size()) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.size()) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.size(1)
+            start_positions.clamp_(0, ignored_index)
+            end_positions.clamp_(0, ignored_index)
+
+            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+            outputs = (total_loss,) + outputs
+
+        return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+
+
+# class LesBertAOA(BertPreTrainedModel):
+#     def __init__(self, config):
+#         super(LesBertAOA, self).__init__(config)
+#         self.num_labels = config.num_labels
+#
+#         self.bert = BertModel(config)
+#         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+#
+#         self.max_query_len = 64
+#
+#         self.apply(self.init_weights)
+#
+#     def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
+#                 end_positions=None, position_ids=None, head_mask=None,
+#                 input_span_mask=None):
+#         outputs = self.bert(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
+#                             attention_mask=attention_mask, head_mask=head_mask)
+#         sequence_output = outputs[0]
+#
+#         logits = self.qa_outputs(sequence_output)
+#         start_logits, end_logits = logits.split(1, dim=-1)
+#         start_logits = start_logits.squeeze(-1)
+#         end_logits = end_logits.squeeze(-1)
+#
+#         # 增加Attention-Over-Attention
+#         # 1. 得到matrix和mask
+#         aoa_attention_matrix = torch.bmm(sequence_output[:, :self.max_query_len, :], sequence_output.transpose(1, 2))  # (B,64,512)
+#         aoa_attention_matrix = aoa_attention_matrix[:, 1:, :]  # (B,63,512)
+#         aoa_mask = input_span_mask[:, :self.max_query_len].unsqueeze(2) ^ input_span_mask.unsqueeze(1)  # (B,64,512)
+#         aoa_mask = aoa_mask[:, 1:, :]  # (B,63,512)
+#         for batch_id in range(aoa_mask.size(0)):
+#             for i in range(aoa_mask.size(1)):
+#                 if aoa_mask[batch_id][i][0].item() == 0:
+#                     aoa_mask[batch_id][i:] = 0
+#                     break
+#         aoa_adder = (1.0 - aoa_mask.float()) * -10000.0  # (B,63,512)
+#         aoa_attention_matrix += aoa_adder
+#
+#         # 2. 计算attention, matrix第0维代表batch, 第1维代表query,第2维代表document
+#         q2c = F.softmax(aoa_attention_matrix, dim=2)  # (B,63,512)
+#         c2q = F.softmax(aoa_attention_matrix, dim=1).mean(dim=2, keepdim=True)  # (B,63,1)
+#         aoa_attention = torch.sum(q2c * c2q, dim=1)  # (B,512)
+#
+#         # 增加input_span_mask, 这里为None时会报错(防止特征没有load)
+#         adder = (1.0 - input_span_mask.float()) * -10000.0
+#         start_logits += adder
+#         end_logits += adder
+#
+#         # 用AOA对Logit进行mask
+#         start_logits *= aoa_attention
+#         end_logits *= aoa_attention
+#
+#         outputs = (start_logits, end_logits,) + outputs[2:]
+#         if start_positions is not None and end_positions is not None:
+#             # If we are on multi-GPU, split add a dimension
+#             if len(start_positions.size()) > 1:
+#                 start_positions = start_positions.squeeze(-1)
+#             if len(end_positions.size()) > 1:
+#                 end_positions = end_positions.squeeze(-1)
+#             # sometimes the start/end positions are outside our model inputs, we ignore these terms
+#             ignored_index = start_logits.size(1)
+#             start_positions.clamp_(0, ignored_index)
+#             end_positions.clamp_(0, ignored_index)
+#
+#             loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+#             start_loss = loss_fct(start_logits, start_positions)
+#             end_loss = loss_fct(end_logits, end_positions)
+#             total_loss = (start_loss + end_loss) / 2
+#             outputs = (total_loss,) + outputs
+#
+#         return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
 
 class LesAnswerVerification(BertPreTrainedModel):
