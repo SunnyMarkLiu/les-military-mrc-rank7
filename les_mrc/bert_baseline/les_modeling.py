@@ -65,17 +65,32 @@ class LesBertHighway(BertPreTrainedModel):
         self.num_labels = config.num_labels
 
         self.bert = BertModel(config)
-        self.highway = Highway(input_dim=config.hidden_size, num_layers=2)  # 增加highway层
-        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+
+        # 加入特征后hidden_size会改变
+        self.hidden_size = config.hidden_size
+
+        # 增加doc_position特征
+        self.doc_position_dim = 5
+        self.hidden_size += self.doc_position_dim
+
+        # 增加highway层
+        self.highway = Highway(input_dim=self.hidden_size, num_layers=2)
+
+        self.qa_outputs = nn.Linear(self.hidden_size, config.num_labels)
 
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
                 end_positions=None, position_ids=None, head_mask=None,
-                input_span_mask=None):
+                input_span_mask=None, doc_position=None):
         outputs = self.bert(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
                             attention_mask=attention_mask, head_mask=head_mask)
         sequence_output = outputs[0]
+
+        # 增加doc_position特征
+        doc_position = F.one_hot(doc_position, num_classes=self.doc_position_dim)  # (B,5)
+        doc_position = doc_position.unsqueeze(1).expand(-1, sequence_output.size(1), -1)  # (B,L,5)
+        sequence_output = torch.cat([sequence_output, doc_position.float()], dim=-1)  # (B,L,D+5)
 
         # 增加highway层
         sequence_output = self.highway(sequence_output)

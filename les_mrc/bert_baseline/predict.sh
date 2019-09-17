@@ -1,13 +1,13 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/mrc_dataset_add_back_trans"
+DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/mrc_dataset"
 MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
-RELOAD_MODEL_DIR="models/les_bert_wwm_add_back_trans_trains"
+RELOAD_MODEL_DIR="models/bert_wwm_highway_doc_position/checkpoint-best"
 
 python run_les.py \
-    --cuda_devices 0,1,2,3 \
+    --cuda_devices 0,1,2 \
     --model_type bert \
-    --customer_model_class BertForLes \
+    --customer_model_class LesBertHighway \
     --model_name_or_path $RELOAD_MODEL_DIR/pytorch_model.bin \
     --config_name $MODEL_DIR/bert_config.json \
     --tokenizer_name $MODEL_DIR/vocab.txt \

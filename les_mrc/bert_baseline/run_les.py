@@ -149,7 +149,8 @@ def train(args, train_dataset, model, tokenizer):
                                'p_mask':       batch[6]})
 
             # TODO 这里增加一些特征, 注意batch[index]正确对应
-            inputs.update({'input_span_mask': batch[7]})
+            inputs.update({'input_span_mask': batch[7],
+                           'doc_position': batch[8]})
 
             outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in pytorch-transformers (see doc)
@@ -255,7 +256,8 @@ def evaluate(args, model, tokenizer, prefix="les"):
                                'p_mask':    batch[5]})
 
             # TODO 这里增加一些特征, 注意batch[index]正确对应
-            inputs.update({'input_span_mask': batch[6]})
+            inputs.update({'input_span_mask': batch[6],
+                           'doc_position': batch[7]})
 
             outputs = model(**inputs)
 
@@ -369,16 +371,19 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
     all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
     all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
     all_input_span_mask = torch.tensor([f.input_span_mask for f in features], dtype=torch.long)
+    all_doc_position = torch.tensor([f.doc_position for f in features], dtype=torch.long)
     if evaluate:
         all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
         dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
-                                all_example_index, all_cls_index, all_p_mask, all_input_span_mask)
+                                all_example_index, all_cls_index, all_p_mask,
+                                all_input_span_mask, all_doc_position)
     else:
         all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
         all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
         dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
                                 all_start_positions, all_end_positions,
-                                all_cls_index, all_p_mask, all_input_span_mask)
+                                all_cls_index, all_p_mask,
+                                all_input_span_mask, all_doc_position)
 
     if output_examples:
         return dataset, examples, features

@@ -46,7 +46,8 @@ class SquadExample(object):
                  orig_answer_text=None,
                  start_position=None,
                  end_position=None,
-                 is_impossible=None):
+                 is_impossible=None,
+                 doc_position=None):
         self.qas_id = qas_id
         self.question_text = question_text
         self.doc_tokens = doc_tokens
@@ -54,6 +55,7 @@ class SquadExample(object):
         self.start_position = start_position
         self.end_position = end_position
         self.is_impossible = is_impossible
+        self.doc_position = doc_position
 
     def __str__(self):
         return self.__repr__()
@@ -92,7 +94,8 @@ class InputFeatures(object):
                  paragraph_len,
                  start_position=None,
                  end_position=None,
-                 is_impossible=None):
+                 is_impossible=None,
+                 doc_position=None):
         self.unique_id = unique_id
         self.example_index = example_index
         self.doc_span_index = doc_span_index
@@ -109,6 +112,7 @@ class InputFeatures(object):
         self.start_position = start_position
         self.end_position = end_position
         self.is_impossible = is_impossible
+        self.doc_position = doc_position
 
 
 def read_squad_examples(input_file, is_training, version_2_with_negative):
@@ -175,7 +179,8 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                                 orig_answer_text=orig_answer_text,
                                 start_position=start_position,
                                 end_position=end_position,
-                                is_impossible=is_impossible)
+                                is_impossible=is_impossible,
+                                doc_position=doc_id)
                             examples.append(example)
                     else:
                         # 训练集中没有答案的document
@@ -192,7 +197,8 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                             orig_answer_text=orig_answer_text,
                             start_position=start_position,
                             end_position=end_position,
-                            is_impossible=is_impossible)
+                            is_impossible=is_impossible,
+                            doc_position=doc_id)
                         examples.append(example)
             else:
                 # not training
@@ -216,7 +222,8 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                         orig_answer_text=orig_answer_text,
                         start_position=start_position,
                         end_position=end_position,
-                        is_impossible=is_impossible)
+                        is_impossible=is_impossible,
+                        doc_position=doc_id)
                     examples.append(example)
     return examples
 
@@ -460,6 +467,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 logger.info("*** Example ***")
                 logger.info("unique_id: %s" % (unique_id))
                 logger.info("qas_id: %s" % (example.qas_id))
+                logger.info("doc_position: %s" % (example.doc_position))
                 logger.info("example_index: %s" % (example_index))
                 logger.info("doc_span_index: %s" % (doc_span_index))
                 logger.info("tokens: %s" % " ".join(tokens))
@@ -501,7 +509,8 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                     paragraph_len=paragraph_len,
                     start_position=start_position,
                     end_position=end_position,
-                    is_impossible=span_is_impossible))
+                    is_impossible=span_is_impossible,
+                    doc_position=example.doc_position))
             unique_id += 1
 
     # 打印未识别或者被跳过的token

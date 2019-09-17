@@ -1,13 +1,13 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/mrc_dataset_add_back_trans"
+DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/mrc_dataset"
 MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
 
 python run_les.py \
     --cuda_devices 0,1,2 \
-    --comment bert_wwm_add_back_translate_trainsets \
+    --comment bert_wwm_highway_doc_position \
     --model_type bert \
-    --customer_model_class BertForLes \
+    --customer_model_class LesBertHighway \
     --model_name_or_path $MODEL_DIR/pytorch_model.bin \
     --config_name $MODEL_DIR/bert_config.json \
     --tokenizer_name $MODEL_DIR/vocab.txt \
@@ -15,9 +15,9 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file $DATA_DIR/new_train_max_content_len_1000.json \
+    --train_file $DATA_DIR/train_max_content_len_1000.json \
     --predict_file $DATA_DIR/dev.json \
-    --output_dir models/les_bert_wwm_add_back_trans_trains \
+    --output_dir models/bert_wwm_highway_doc_position \
     --version_2_with_negative \
     --max_seq_length 512 \
     --max_query_length 64 \
