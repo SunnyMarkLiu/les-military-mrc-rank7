@@ -31,16 +31,15 @@ def back_translate(text):
     """
     result = translator.translate(text, src='zh', dst='en')
     result = result['trans_result']['data'][0]['dst']
-
+    time.sleep(1)
     back_content = translator.translate(result, src='en', dst='zh')
     back_content = back_content['trans_result']['data'][0]['dst']
-
+    time.sleep(1)
     return back_content
 
 
 def translate_sample(sample):
     sample['question'] = back_translate(sample['question'])
-    time.sleep(1)
 
     back_trans_answer = ''
     ans_in_docids = find_answer_in_docid(sample['answer'])
@@ -54,7 +53,6 @@ def translate_sample(sample):
                 answer_str = answer_str.replace('content{}@'.format(ans_in_docid), '')
                 back_trans_answer += (flag_str + back_translate(answer_str) + flag_str)
     sample['answer'] = back_trans_answer
-    time.sleep(1)
 
     back_supporting_paragraph = ''
     sup_para_in_docids = find_answer_in_docid(sample['supporting_paragraph'])
@@ -68,11 +66,12 @@ def translate_sample(sample):
                 sup_para_str = sup_para_str.replace('content{}@'.format(docid), '')
                 back_supporting_paragraph += (flag_str + back_translate(sup_para_str) + flag_str)
     sample['supporting_paragraph'] = back_supporting_paragraph
-    time.sleep(1)
 
     for doc in sample['documents']:
         doc['content'] = back_translate(doc['content'])
-        time.sleep(1)
+
+        if 'supported_para_mask' in doc:
+            del doc['supported_para_mask']
 
     del sample['fake_answers']
     del sample['ceil_rougel']
@@ -90,5 +89,5 @@ if __name__ == '__main__':
             translate_sample(sample)
             print(json.dumps(sample, ensure_ascii=False))
         except:
-            time.sleep(10)
+            time.sleep(6)
             continue
