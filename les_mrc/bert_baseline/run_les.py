@@ -326,10 +326,13 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
         data_type = 'dev'
     else:
         data_type = 'train'
-    cached_features_file = os.path.join(os.path.dirname(input_file), 'cached_{}_{}_{}'.format(
-        data_type,
-        list(filter(None, args.model_name_or_path.split('/'))).pop(),
-        str(args.max_seq_length)))
+
+    if data_type == 'train':
+        cached_features_file = os.path.join(os.path.dirname(input_file), 'cached_{}_seqlen{}_querylen{}_answerlen{}_docstride{}_train_neg_sample_ratio{}'.format(
+            data_type, args.max_seq_length, args.max_query_length, args.max_answer_length, args.doc_stride, args.train_neg_sample_ratio))
+    else:
+        cached_features_file = os.path.join(os.path.dirname(input_file), 'cached_{}_seqlen{}_querylen{}_answerlen{}_docstride{}'.format(
+            data_type, args.max_seq_length, args.max_query_length, args.max_answer_length, args.doc_stride))
 
     examples = None
     features = None
@@ -355,7 +358,8 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
                                                 max_seq_length=args.max_seq_length,
                                                 doc_stride=args.doc_stride,
                                                 max_query_length=args.max_query_length,
-                                                is_training=not evaluate)
+                                                is_training=not evaluate,
+                                                train_neg_sample_ratio=args.train_neg_sample_ratio)
         if args.local_rank in [-1, 0]:
             logger.info("Saving features into cached file %s", cached_features_file)
             torch.save(features, cached_features_file)
@@ -473,6 +477,8 @@ def main():
     parser.add_argument("--max_answer_length", default=30, type=int,
                         help="The maximum length of an answer that can be generated. This is needed because the start "
                              "and end predictions are not conditioned on one another.")
+    parser.add_argument("--train_neg_sample_ratio", default=0.5, type=float,
+                        help="the ratio of sampling the negetive doc_spans when sliding window")
     parser.add_argument("--verbose_logging", action='store_true',
                         help="If true, all of the warnings related to data processing will be printed. "
                              "A number of warnings are expected for a normal SQuAD evaluation.")

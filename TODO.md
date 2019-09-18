@@ -5,9 +5,16 @@
     - 段落筛选难以保证答案覆盖率
 - 存在重复问题
 
+## 特征工程
+- https://github.com/ShusenTang/BDC2019
+- https://github.com/srtianxia/BDC2019_Rank2
+
 ## bert-baseline相关
 - 训练被截断的例子的处理
 - 分词器可以优化, 参照CMRC2018的自定义分词器; 另外CMRC2018还增加了input_span_mask字段,可以试一试
 - 对OOV的词进行处理
 - 一些小细节用TODO标签定位了
 - 对于被截断的训练集是否需要丢弃
+
+## 多任务
+根据 start end logits 的最大值定位的答案所在的句子，作为模型选出来的 “support para”，然后和question进行类似 NLI （或者简单点的attention），得到模型筛选答案的依据“support para”，是否和问题问的相关的

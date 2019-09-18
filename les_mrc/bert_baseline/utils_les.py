@@ -28,8 +28,7 @@ from pytorch_transformers.tokenization_bert import BasicTokenizer, whitespace_to
 
 # Required by XLNet evaluation method to compute optimal threshold (see write_predictions_extended() method)
 from utils_les_evaluate import find_all_best_thresh_v2, make_qid_to_has_ans, get_raw_scores
-from eval_metric import normalize, compute_bleu_rouge
-
+import random
 logger = logging.getLogger(__name__)
 
 
@@ -234,7 +233,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                                  cls_token='[CLS]', sep_token='[SEP]', pad_token=0,
                                  sequence_a_segment_id=0, sequence_b_segment_id=1,
                                  cls_token_segment_id=0, pad_token_segment_id=0,
-                                 mask_padding_with_zero=True):
+                                 mask_padding_with_zero=True, train_neg_sample_ratio=0.5):
     """Loads a data file into a list of `InputBatch`s."""
 
     unique_id = 1000000000
@@ -264,7 +263,8 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     features = []
     unk_tokens_dict = collections.defaultdict(int)  # 记录vocab中找不到的token
     skipped_tokens_dict = collections.defaultdict(int)  # 记录tokenize后被删掉的token
-    log_steps = 5000  # log打印间隔
+    log_steps = 100  # log打印间隔
+    logger.info('total examples: {}'.format(len(examples)))
     for (example_index, example) in enumerate(examples):
         if log_steps > 0 and (example_index + 1) % log_steps == 0:
             logger.info('we have converted {} examples to features'.format(example_index + 1))
@@ -459,11 +459,17 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                     start_position = tok_start_position - doc_start + doc_offset
                     end_position = tok_end_position - doc_start + doc_offset
 
+            # TODO：不包含答案，负样本采样策略：
+            # 1. 设置负样本丢弃概率阈值，random < 阈值，丢弃该负样本
+            # 2. 根据该 question id 中可能包含多个答案的 doc_span，不同 qid 的doc_span也不同，按照包含答案和不包含答案的比例进行负样本采样
             if is_training and span_is_impossible:
+                if random.random() < train_neg_sample_ratio:
+                    continue
+
                 start_position = cls_index
                 end_position = cls_index
 
-            if example_index < 5:
+            if example_index < 0:
                 logger.info("*** Example ***")
                 logger.info("unique_id: %s" % (unique_id))
                 logger.info("qas_id: %s" % (example.qas_id))
