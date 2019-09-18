@@ -4,9 +4,8 @@ import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from pytorch_transformers import BertPreTrainedModel, BertModel
 
-import sys
-sys.path.append('..')
 from nn.layers import Highway
+from nn.recurrent import BiGRU, MultiLayerBiGRU
 
 VERY_NEGATIVE_NUMBER = -1e29
 
@@ -23,7 +22,7 @@ class BertForLes(BertPreTrainedModel):
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
                 end_positions=None, position_ids=None, head_mask=None,
-                input_span_mask=None):
+                input_span_mask=None, doc_position=None):
         outputs = self.bert(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
                             attention_mask=attention_mask, head_mask=head_mask)
         sequence_output = outputs[0]
@@ -58,6 +57,68 @@ class BertForLes(BertPreTrainedModel):
 
         return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
+
+class BertConcatBiGRU(BertPreTrainedModel):
+    """
+    bert encoder 输出结合 char2vec + bigru 输出
+    """
+
+    def __init__(self, config, custom_vocab, bigru_hidden_size):
+        super(BertConcatBiGRU, self).__init__(config)
+
+        self.num_labels = config.num_labels
+        self.bert_encoder = BertModel(config)
+
+        # 自定义 vocab 下的 embedding layer
+        self.char_embeddings = nn.Embedding(custom_vocab.vocab_size, custom_vocab.embed_dim,
+                                            padding_idx=0, _weight=custom_vocab.embedding_matrix)
+        # bilstm、bigru layer
+        self.birnn_encoder = BiGRU(input_size=custom_vocab.embed_dim, hidden_size=bigru_hidden_size)
+        self.highway = Highway(input_dim=self.hidden_size, num_layers=2)
+
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
+                end_positions=None, position_ids=None, head_mask=None,
+                input_span_mask=None, doc_position=None):
+        outputs = self.bert_encoder(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
+                                    attention_mask=attention_mask, head_mask=head_mask)
+        bert_reprs = outputs[0]
+
+        char_embed = self.char_embeddings(input_ids)
+        char_reprs, _ = self.birnn_encoder(inputs=char_embed, lengths=None)
+
+        # 拼接 bert 输出和 bigru 编码输出，再 highway 组合
+        sequence_output = torch.cat([bert_reprs, char_reprs], dim=-1)
+        sequence_output = self.highway(sequence_output)
+
+        logits = self.qa_outputs(sequence_output)
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
+
+        # 增加input_span_mask, 这里为None时会报错(防止特征没有load)
+        adder = (1.0 - input_span_mask.float()) * VERY_NEGATIVE_NUMBER
+        start_logits += adder
+        end_logits += adder
+
+        outputs = (start_logits, end_logits,) + outputs[2:]
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.size()) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.size()) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.size(1)
+            start_positions.clamp_(0, ignored_index)
+            end_positions.clamp_(0, ignored_index)
+
+            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+            outputs = (total_loss,) + outputs
+
+        return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
 class LesBertHighway(BertPreTrainedModel):
     def __init__(self, config):
