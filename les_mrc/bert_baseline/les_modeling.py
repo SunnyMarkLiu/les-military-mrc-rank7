@@ -67,7 +67,7 @@ class BertConcatBiGRU(BertPreTrainedModel):
         super(BertConcatBiGRU, self).__init__(config)
 
         self.num_labels = config.num_labels
-        self.bert_encoder = BertModel(config)
+        self.bert = BertModel(config)
 
         # 自定义 vocab 下的 embedding layer
         self.char_embeddings = nn.Embedding(custom_vocab.vocab_size, custom_vocab.embed_dim,
@@ -85,7 +85,7 @@ class BertConcatBiGRU(BertPreTrainedModel):
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
                 end_positions=None, position_ids=None, head_mask=None,
                 input_span_mask=None, doc_position=None):
-        outputs = self.bert_encoder(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
+        outputs = self.bert(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
                                     attention_mask=attention_mask, head_mask=head_mask)
         bert_reprs = outputs[0]
 
