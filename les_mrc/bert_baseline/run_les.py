@@ -394,6 +394,25 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
     return dataset
 
 
+def load_custom_vocab(vocab_file, do_lower_case):
+    import pickle
+
+    if os.path.exists('custom_vocab.pkl'):
+        logger.info('load custom_vocab and embeddings matrix from cache')
+        with open('custom_vocab.pkl', 'rb') as f:
+            custom_vocab = pickle.load(f)
+    else:
+        from custom_vocab import CustomVocab
+        logger.info('load custom_vocab and build char embeddings matrix')
+        custom_vocab = CustomVocab(vocab_file=vocab_file, do_lower_case=do_lower_case)
+        custom_vocab.build_embedding_matrix('../../input/embeddings/cbow_win10_mincnt5_neg5_dim100.txt')
+
+        logger.info('save the custom_vocab to cache')
+        with open('custom_vocab.pkl', "wb") as f:
+            pickle.dump(custom_vocab, f, -1)
+    return custom_vocab
+
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -578,11 +597,10 @@ def main():
     custom_vocab = None
     bigru_hidden_size = 100
     if args.customer_model_class.lower() == 'BertConcatBiGRU'.lower():
-        logger.info('load custom_vocab and char embeddings')
-        from custom_vocab import CustomVocab
-        custom_vocab = CustomVocab(vocab_file=args.tokenizer_name, do_lower_case=args.do_lower_case)
-        logger.info('vocab size: {}'.format(custom_vocab.vocab_size))
-        custom_vocab.embed_dim = 300
+        custom_vocab = load_custom_vocab(vocab_file=args.tokenizer_name, do_lower_case=args.do_lower_case)
+        logger.info('vocab size: {}, embed dim: {}'.format(custom_vocab.vocab_size, custom_vocab.embed_dim))
+        logger.info('embedding_matrix: {}'.format(custom_vocab.embedding_matrix.shape))
+        custom_vocab.embedding_matrix = torch.from_numpy(custom_vocab.embedding_matrix)
         model = model_class.from_pretrained(args.model_name_or_path, from_tf=bool('.ckpt' in args.model_name_or_path), config=config,
                                             custom_vocab=custom_vocab, bigru_hidden_size=bigru_hidden_size)
     else:
@@ -600,7 +618,6 @@ def main():
         train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=False)
         global_step, tr_loss = train(args, train_dataset, model, tokenizer)
         logger.info(" global_step = %s, average loss = %s", global_step, tr_loss)
-
 
     # Save the trained model and the tokenizer
     if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
@@ -626,7 +643,6 @@ def main():
         tokenizer = tokenizer_class.from_pretrained(args.output_dir, do_lower_case=args.do_lower_case)
         model.to(args.device)
 
-
     # Evaluation - we can ask to evaluate all the checkpoints (sub-directories) in a directory
     results = {}
     if args.do_eval and args.local_rank in [-1, 0]:
@@ -642,6 +658,10 @@ def main():
             global_step = checkpoint.split('-')[-1] if len(checkpoints) > 1 else ""
 
             if args.customer_model_class.lower() == 'BertConcatBiGRU'.lower():
+                custom_vocab = load_custom_vocab(vocab_file=args.tokenizer_name, do_lower_case=args.do_lower_case)
+                logger.info('vocab size: {}, embed dim: {}'.format(custom_vocab.vocab_size, custom_vocab.embed_dim))
+                logger.info('embedding_matrix: {}'.format(custom_vocab.embedding_matrix.shape))
+                custom_vocab.embedding_matrix = torch.from_numpy(custom_vocab.embedding_matrix)
                 model = model_class.from_pretrained(checkpoint, custom_vocab=custom_vocab, bigru_hidden_size=bigru_hidden_size)
             else:
                 model = model_class.from_pretrained(checkpoint)

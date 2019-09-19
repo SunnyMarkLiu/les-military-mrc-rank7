@@ -30,7 +30,7 @@ python run_les.py \
     --warmup_steps 5200 \
     --warmup_proportion 0.1 \
     --num_train_epochs 1 \
-    --gradient_accumulation_steps 2 \
+    --gradient_accumulation_steps 1 \
     --doc_stride 128 \
     --logging_steps 200 \
     --save_steps 8000 \

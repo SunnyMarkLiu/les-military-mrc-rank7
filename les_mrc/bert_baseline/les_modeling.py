@@ -5,7 +5,7 @@ from torch.nn import CrossEntropyLoss
 from pytorch_transformers import BertPreTrainedModel, BertModel
 
 from nn.layers import Highway
-from nn.recurrent import BiGRU, MultiLayerBiGRU
+from nn.recurrent import BiGRU
 
 VERY_NEGATIVE_NUMBER = -1e29
 
@@ -72,6 +72,9 @@ class BertConcatBiGRU(BertPreTrainedModel):
         # 自定义 vocab 下的 embedding layer
         self.char_embeddings = nn.Embedding(custom_vocab.vocab_size, custom_vocab.embed_dim,
                                             padding_idx=0, _weight=custom_vocab.embedding_matrix)
+        self.char_embeddings = self.char_embeddings.float()
+        self.char_embeddings.weight.requires_grad = True
+
         # bilstm、bigru layer
         self.birnn_encoder = BiGRU(input_size=custom_vocab.embed_dim, hidden_size=bigru_hidden_size)
 
