@@ -50,7 +50,7 @@ from utils_les import (read_squad_examples, convert_examples_to_features,
 # We've added it here for automated tests (see examples/test_examples.py file)
 from utils_les_evaluate import evaluate_on_les
 
-from les_modeling import BertForLes, LesAnswerVerification, LesBertHighway
+from les_modeling import BertForLes, LesAnswerVerification, LesBertHighway, BertConcatBiGRU
 
 logger = logging.getLogger(__name__)
 
@@ -566,12 +566,26 @@ def main():
     elif args.customer_model_class.lower() == 'LesBertHighway'.lower():
         model_class = LesBertHighway
         logger.warning('We load customer model `{}`, rather than normal bert model'.format(model_class.__name__))
+    elif args.customer_model_class.lower() == 'BertConcatBiGRU'.lower():
+        model_class = BertConcatBiGRU
+        logger.warning('We load customer model `{}`, rather than normal bert model'.format(model_class.__name__))
     else:
         raise NotImplementedError('We have not implemented the {} model class'.format(args.customer_model_class))
 
     config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path)
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name if args.tokenizer_name else args.model_name_or_path, do_lower_case=args.do_lower_case)
-    model = model_class.from_pretrained(args.model_name_or_path, from_tf=bool('.ckpt' in args.model_name_or_path), config=config)
+
+    if args.customer_model_class.lower() == 'BertConcatBiGRU'.lower():
+        logger.info('load custom_vocab and char embeddings')
+        from custom_vocab import CustomVocab
+        custom_vocab = CustomVocab(vocab_file=args.tokenizer_name, do_lower_case=args.do_lower_case)
+        logger.info('vocab size: {}'.format(custom_vocab.vocab_size))
+        custom_vocab.embed_dim = 150
+        bigru_hidden_size = 100
+        model = model_class.from_pretrained(args.model_name_or_path, from_tf=bool('.ckpt' in args.model_name_or_path), config=config,
+                                            custom_vocab=custom_vocab, bigru_hidden_size=bigru_hidden_size)
+    else:
+        model = model_class.from_pretrained(args.model_name_or_path, from_tf=bool('.ckpt' in args.model_name_or_path), config=config)
 
     if args.local_rank == 0:
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab

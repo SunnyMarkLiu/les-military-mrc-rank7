@@ -263,7 +263,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     features = []
     unk_tokens_dict = collections.defaultdict(int)  # 记录vocab中找不到的token
     skipped_tokens_dict = collections.defaultdict(int)  # 记录tokenize后被删掉的token
-    log_steps = 100  # log打印间隔
+    log_steps = 5000  # log打印间隔
     logger.info('total examples: {}'.format(len(examples)))
     for (example_index, example) in enumerate(examples):
         if log_steps > 0 and (example_index + 1) % log_steps == 0:

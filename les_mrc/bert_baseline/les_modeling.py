@@ -74,7 +74,13 @@ class BertConcatBiGRU(BertPreTrainedModel):
                                             padding_idx=0, _weight=custom_vocab.embedding_matrix)
         # bilstm、bigru layer
         self.birnn_encoder = BiGRU(input_size=custom_vocab.embed_dim, hidden_size=bigru_hidden_size)
+
+        self.hidden_size = config.hidden_size + bigru_hidden_size * 2
+
         self.highway = Highway(input_dim=self.hidden_size, num_layers=2)
+        self.qa_outputs = nn.Linear(self.hidden_size, config.num_labels)
+
+        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
                 end_positions=None, position_ids=None, head_mask=None,
@@ -85,7 +91,6 @@ class BertConcatBiGRU(BertPreTrainedModel):
 
         char_embed = self.char_embeddings(input_ids)
         char_reprs, _ = self.birnn_encoder(inputs=char_embed, lengths=None)
-
         # 拼接 bert 输出和 bigru 编码输出，再 highway 组合
         sequence_output = torch.cat([bert_reprs, char_reprs], dim=-1)
         sequence_output = self.highway(sequence_output)
@@ -276,7 +281,7 @@ class LesAnswerVerification(BertPreTrainedModel):
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
                 end_positions=None, position_ids=None, head_mask=None,
-                input_span_mask=None):
+                input_span_mask=None, doc_position=None):
         outputs = self.bert(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
                             attention_mask=attention_mask, head_mask=head_mask)
         sequence_output = outputs[0]

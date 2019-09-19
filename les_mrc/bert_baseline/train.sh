@@ -2,13 +2,13 @@
 set -ex
 DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/mrc_dataset_test/"
 MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="bert_wwm_lr_cosine_schedule_finetune"
+MODEL_COMMENT="bert_wwm_LesBertHighway"
 
 python run_les.py \
-    --cuda_devices 1 \
+    --cuda_devices 0 \
     --comment ${MODEL_COMMENT} \
     --model_type bert \
-    --customer_model_class BertForLes \
+    --customer_model_class LesBertHighway \
     --model_name_or_path ${MODEL_DIR}/pytorch_model.bin \
     --config_name ${MODEL_DIR}/bert_config.json \
     --tokenizer_name ${MODEL_DIR}/vocab.txt \
@@ -23,7 +23,7 @@ python run_les.py \
     --max_seq_length 512 \
     --max_query_length 80 \
     --max_answer_length 80 \
-    --train_neg_sample_ratio 0.1 \
+    --train_neg_sample_ratio 0.0 \
     --per_gpu_train_batch_size 7 \
     --per_gpu_eval_batch_size 24 \
     --learning_rate 3e-5 \
