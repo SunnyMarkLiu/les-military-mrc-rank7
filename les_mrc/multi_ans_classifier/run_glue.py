@@ -118,6 +118,7 @@ def train(args, train_dataset, model, tokenizer):
 
     global_step = 0
     tr_loss, logging_loss = 0.0, 0.0
+    best_acc_score = 0.0
     model.zero_grad()
     train_iterator = trange(int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0])
     set_seed(args)  # Added here for reproductibility (even between python 2 and 3)
@@ -153,14 +154,33 @@ def train(args, train_dataset, model, tokenizer):
                 model.zero_grad()
                 global_step += 1
 
+                if args.local_rank == -1 and args.evaluate_during_training and (
+                   args.eval_steps > 0 and global_step % args.eval_steps == 0):  # Only evaluate when single GPU otherwise metrics may not average well
+                    results = evaluate(args, model, tokenizer)
+                    logger.info('eval at {} global steps: {}'.format(global_step, results))
+                    for key, value in results.items():
+                        tb_writer.add_scalar('eval_{}'.format(key), value, global_step)
+                    # 记录并保存最好的模型
+                    if results['acc'] > best_acc_score:
+                        logger.warning('New record at {} global steps, its acc score is {}'
+                                       .format(global_step, results['acc']))
+                        best_acc_score = results['acc']
+
+                        # Save best model
+                        logger.info('Saving new best score model...')
+                        output_dir = os.path.join(args.output_dir, 'checkpoint-best')
+                        if not os.path.exists(output_dir):
+                            os.makedirs(output_dir)
+                        model_to_save = model.module if hasattr(model, 'module') else model  # Take care of distributed/parallel training
+                        model_to_save.save_pretrained(output_dir)
+                        torch.save(args, os.path.join(output_dir, 'training_args.bin'))
+
                 if args.local_rank in [-1, 0] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
                     # Log metrics
-                    if args.local_rank == -1 and args.evaluate_during_training:  # Only evaluate when single GPU otherwise metrics may not average well
-                        results = evaluate(args, model, tokenizer)
-                        for key, value in results.items():
-                            tb_writer.add_scalar('eval_{}'.format(key), value, global_step)
                     tb_writer.add_scalar('lr', scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar('loss', (tr_loss - logging_loss)/args.logging_steps, global_step)
+                    logger.info('at {} global steps, lr is {}'.format(global_step, scheduler.get_lr()[0]))
+                    logger.info('at {} global steps, loss is {}'.format(global_step, (tr_loss - logging_loss)/args.logging_steps))
                     logging_loss = tr_loss
 
                 if args.local_rank in [-1, 0] and args.save_steps > 0 and global_step % args.save_steps == 0:
@@ -186,7 +206,7 @@ def train(args, train_dataset, model, tokenizer):
     return global_step, tr_loss / global_step
 
 
-def evaluate(args, model, tokenizer, prefix=""):
+def evaluate(args, model, tokenizer, prefix="les-multi-ans"):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_task_names = ("mnli", "mnli-mm") if args.task_name == "mnli" else (args.task_name,)
     eval_outputs_dirs = (args.output_dir, args.output_dir + '-MM') if args.task_name == "mnli" else (args.output_dir,)
@@ -237,15 +257,25 @@ def evaluate(args, model, tokenizer, prefix=""):
             preds = np.argmax(preds, axis=1)
         elif args.output_mode == "regression":
             preds = np.squeeze(preds)
-        result = compute_metrics(eval_task, preds, out_label_ids)
-        results.update(result)
 
-        output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
-        with open(output_eval_file, "w") as writer:
-            logger.info("***** Eval results {} *****".format(prefix))
-            for key in sorted(result.keys()):
-                logger.info("  %s = %s", key, str(result[key]))
-                writer.write("%s = %s\n" % (key, str(result[key])))
+        if args.do_only_predict:
+            output_prediction_file = os.path.join(eval_output_dir, "pred_results.txt")
+            with open(output_prediction_file, 'w') as writer:
+                logger.info("***** Saving prediction results {} *****".format(prefix))
+                for pred in preds:
+                    writer.write("{}\n".format(pred))
+            results = {'info': 'No score when predict on test set'}
+        else:
+            result = compute_metrics(eval_task, preds, out_label_ids)
+            result['eval_loss'] = eval_loss  # 增加eval_loss
+            results.update(result)
+
+            output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
+            with open(output_eval_file, "w") as writer:
+                logger.info("***** Eval results {} *****".format(prefix))
+                for key in sorted(result.keys()):
+                    logger.info("  %s = %s", key, str(result[key]))
+                    writer.write("%s = %s\n" % (key, str(result[key])))
 
     return results
 
@@ -256,12 +286,20 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
 
     processor = processors[task]()
     output_mode = output_modes[task]
+
+    data_type = None
+    if args.do_only_predict:
+        data_type = 'test'
+    elif evaluate:
+        data_type = 'dev'
+    else:
+        data_type = 'train'
+
     # Load data features from cache or dataset file
-    cached_features_file = os.path.join(args.data_dir, 'cached_{}_{}_{}_{}'.format(
-        'dev' if evaluate else 'train',
-        list(filter(None, args.model_name_or_path.split('/'))).pop(),
-        str(args.max_seq_length),
-        str(task)))
+    cached_features_file = os.path.join(args.data_dir, 'cached_{}_{}_{}'.format(
+        str(task),
+        data_type,
+        str(args.max_seq_length)))
     if os.path.exists(cached_features_file):
         logger.info("Loading features from cached file %s", cached_features_file)
         features = torch.load(cached_features_file)
@@ -270,8 +308,15 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
         label_list = processor.get_labels()
         if task in ['mnli', 'mnli-mm'] and args.model_type in ['roberta']:
             # HACK(label indices are swapped in RoBERTa pretrained model)
-            label_list[1], label_list[2] = label_list[2], label_list[1] 
-        examples = processor.get_dev_examples(args.data_dir) if evaluate else processor.get_train_examples(args.data_dir)
+            label_list[1], label_list[2] = label_list[2], label_list[1]
+
+        if data_type == 'train':
+            examples = processor.get_train_examples(args.train_file)
+        elif data_type == 'dev':
+            examples = processor.get_dev_examples(args.dev_file)
+        else:
+            examples = processor.get_test_examples(args.test_file)
+
         features = convert_examples_to_features(examples, label_list, args.max_seq_length, tokenizer, output_mode,
             cls_token_at_end=bool(args.model_type in ['xlnet']),            # xlnet has a cls token at the end
             cls_token=tokenizer.cls_token,
@@ -306,8 +351,14 @@ def main():
     parser = argparse.ArgumentParser()
 
     ## Required parameters
-    parser.add_argument("--data_dir", default=None, type=str, required=True,
-                        help="The input data dir. Should contain the .tsv files (or other data files) for the task.")
+    parser.add_argument("--train_file", default=None, type=str, required=False,
+                        help="train file path")
+    parser.add_argument("--dev_file", default=None, type=str, required=False,
+                        help="dev file path")
+    parser.add_argument("--test_file", default=None, type=str, required=False,
+                        help="test file path")
+    # parser.add_argument("--data_dir", default=None, type=str, required=True,
+    #                     help="The input data dir. Should contain the .tsv files (or other data files) for the task.")
     parser.add_argument("--model_type", default=None, type=str, required=True,
                         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
     parser.add_argument("--model_name_or_path", default=None, type=str, required=True,
@@ -316,6 +367,10 @@ def main():
                         help="The name of the task to train selected in the list: " + ", ".join(processors.keys()))
     parser.add_argument("--output_dir", default=None, type=str, required=True,
                         help="The output directory where the model predictions and checkpoints will be written.")
+
+    # 设置需要使用的GPU编号
+    parser.add_argument("--cuda_devices", default=None, type=str, required=True,
+                        help="set which gpu(s) will be use, e.g. '0,2,3'.")
 
     ## Other parameters
     parser.add_argument("--config_name", default="", type=str,
@@ -331,6 +386,8 @@ def main():
                         help="Whether to run training.")
     parser.add_argument("--do_eval", action='store_true',
                         help="Whether to run eval on the dev set.")
+    parser.add_argument("--do_only_predict", action='store_true',
+                        help="Only do predict when evaluating.")
     parser.add_argument("--evaluate_during_training", action='store_true',
                         help="Rul evaluation during training at each logging step.")
     parser.add_argument("--do_lower_case", action='store_true',
@@ -361,6 +418,8 @@ def main():
                         help="Log every X updates steps.")
     parser.add_argument('--save_steps', type=int, default=50,
                         help="Save checkpoint every X updates steps.")
+    parser.add_argument('--eval_steps', type=int, default=1000,
+                        help="Eval on eval file every X updates steps.")
     parser.add_argument("--eval_all_checkpoints", action='store_true',
                         help="Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number")
     parser.add_argument("--no_cuda", action='store_true',
@@ -382,6 +441,10 @@ def main():
     parser.add_argument('--server_ip', type=str, default='', help="For distant debugging.")
     parser.add_argument('--server_port', type=str, default='', help="For distant debugging.")
     args = parser.parse_args()
+
+    # 设置cuda devices
+    logger.warning('we set CUDA_VISIBLE_DEVICES: {}'.format(args.cuda_devices))
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_devices
 
     if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train and not args.overwrite_output_dir:
         raise ValueError("Output directory ({}) already exists and is not empty. Use --overwrite_output_dir to overcome.".format(args.output_dir))
