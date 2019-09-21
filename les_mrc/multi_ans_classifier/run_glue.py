@@ -311,11 +311,11 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
             label_list[1], label_list[2] = label_list[2], label_list[1]
 
         if data_type == 'train':
-            examples = processor.get_train_examples(args.train_file)
+            examples = processor.get_train_examples(os.path.join(args.data_dir, args.train_file))
         elif data_type == 'dev':
-            examples = processor.get_dev_examples(args.dev_file)
+            examples = processor.get_dev_examples(os.path.join(args.data_dir, args.dev_file))
         else:
-            examples = processor.get_test_examples(args.test_file)
+            examples = processor.get_test_examples(os.path.join(args.data_dir, args.test_file))
 
         features = convert_examples_to_features(examples, label_list, args.max_seq_length, tokenizer, output_mode,
             cls_token_at_end=bool(args.model_type in ['xlnet']),            # xlnet has a cls token at the end
@@ -351,14 +351,14 @@ def main():
     parser = argparse.ArgumentParser()
 
     ## Required parameters
+    parser.add_argument("--data_dir", default=None, type=str, required=True,
+                        help="The input data dir. Should contain the .tsv files (or other data files) for the task.")
     parser.add_argument("--train_file", default=None, type=str, required=False,
                         help="train file path")
     parser.add_argument("--dev_file", default=None, type=str, required=False,
                         help="dev file path")
     parser.add_argument("--test_file", default=None, type=str, required=False,
                         help="test file path")
-    # parser.add_argument("--data_dir", default=None, type=str, required=True,
-    #                     help="The input data dir. Should contain the .tsv files (or other data files) for the task.")
     parser.add_argument("--model_type", default=None, type=str, required=True,
                         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
     parser.add_argument("--model_name_or_path", default=None, type=str, required=True,
