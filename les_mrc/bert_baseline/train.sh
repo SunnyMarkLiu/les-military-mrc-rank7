@@ -1,14 +1,14 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/mrc_dataset_add_back_trans"
+DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/mrc_dataset_test"
 MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="bert_wwm_BertConcatBiGRU"
+MODEL_COMMENT="bert_wwm_BertForLes_test"
 
 python run_les.py \
-    --cuda_devices 0,2,3 \
+    --cuda_devices 2,3 \
     --comment ${MODEL_COMMENT} \
     --model_type bert \
-    --customer_model_class BertConcatBiGRU \
+    --customer_model_class BertForLes \
     --model_name_or_path ${MODEL_DIR}/pytorch_model.bin \
     --config_name ${MODEL_DIR}/bert_config.json \
     --tokenizer_name ${MODEL_DIR}/vocab.txt \
@@ -16,7 +16,7 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file ${DATA_DIR}/new_train_max_content_len_1000.json \
+    --train_file ${DATA_DIR}/train_max_content_len_1000.json \
     --predict_file ${DATA_DIR}/dev.json \
     --output_dir models/${MODEL_COMMENT} \
     --version_2_with_negative \
@@ -29,7 +29,7 @@ python run_les.py \
     --learning_rate 3e-5 \
     --warmup_steps 5200 \
     --warmup_proportion 0.1 \
-    --num_train_epochs 2 \
+    --num_train_epochs 1 \
     --gradient_accumulation_steps 1 \
     --doc_stride 128 \
     --logging_steps 200 \
