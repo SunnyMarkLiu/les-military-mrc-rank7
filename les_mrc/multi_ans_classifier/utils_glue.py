@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 
 import csv
+import json
 import logging
 import os
 import sys
@@ -302,7 +303,7 @@ class QnliProcessor(DataProcessor):
     def get_dev_examples(self, data_dir):
         """See base class."""
         return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "dev.tsv")), 
+            self._read_tsv(os.path.join(data_dir, "dev.tsv")),
             "dev_matched")
 
     def get_labels(self):
@@ -388,6 +389,46 @@ class WnliProcessor(DataProcessor):
         return examples
 
 
+class LesMultiAnsProcessor(DataProcessor):
+    """Processor for the les-multi-ans data set (GLUE version)."""
+
+    def get_train_examples(self, data_path):
+        """See base class."""
+        return self._create_examples(data_path, "train")
+
+    def get_dev_examples(self, data_path):
+        """See base class."""
+        return self._create_examples(data_path, "dev")
+
+    def get_test_examples(self, data_path):
+        return self._create_examples(data_path, "test")
+
+    def get_labels(self):
+        """See base class."""
+        return ["0", "1"]
+
+    def _create_examples(self, data_path, set_type):
+        """Creates examples for the training and dev and test sets."""
+        is_predicting = True if set_type == "test" else False
+        examples = []
+        # 目前les的数据是json格式
+        with open(data_path) as fin:
+            for (i, line) in enumerate(fin):
+                sample = json.loads(line.strip())
+                guid = sample['question_id']
+                text_a = sample['question']
+                label = None if is_predicting else self._generate_label(sample['answer'])
+                examples.append(
+                    InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+        return examples
+
+    def _generate_label(self, answer_text):
+        if answer_text.count("@content") > 2:
+            return "1"
+        else:
+            return "0"
+
+
 def convert_examples_to_features(examples, label_list, max_seq_length,
                                  tokenizer, output_mode,
                                  cls_token_at_end=False,
@@ -398,7 +439,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
                                  pad_on_left=False,
                                  pad_token=0,
                                  pad_token_segment_id=0,
-                                 sequence_a_segment_id=0, 
+                                 sequence_a_segment_id=0,
                                  sequence_b_segment_id=1,
                                  mask_padding_with_zero=True):
     """ Loads a data file into a list of `InputBatch`s
@@ -488,13 +529,14 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
         assert len(segment_ids) == max_seq_length
 
         if output_mode == "classification":
-            label_id = label_map[example.label]
+            # label_id = label_map[example.label]
+            label_id = 0 if example.label is None else label_map[example.label]  # predict的时候全label_id设置为0
         elif output_mode == "regression":
             label_id = float(example.label)
         else:
             raise KeyError(output_mode)
 
-        if ex_index < 5:
+        if ex_index < 10:
             logger.info("*** Example ***")
             logger.info("guid: %s" % (example.guid))
             logger.info("tokens: %s" % " ".join(
@@ -575,6 +617,8 @@ def compute_metrics(task_name, preds, labels):
         return {"acc": simple_accuracy(preds, labels)}
     elif task_name == "wnli":
         return {"acc": simple_accuracy(preds, labels)}
+    elif task_name == "les-multi-ans":
+        return acc_and_f1(preds, labels)
     else:
         raise KeyError(task_name)
 
@@ -589,6 +633,7 @@ processors = {
     "qnli": QnliProcessor,
     "rte": RteProcessor,
     "wnli": WnliProcessor,
+    "les-multi-ans": LesMultiAnsProcessor,
 }
 
 output_modes = {
@@ -602,6 +647,7 @@ output_modes = {
     "qnli": "classification",
     "rte": "classification",
     "wnli": "classification",
+    "les-multi-ans": "classification",
 }
 
 GLUE_TASKS_NUM_LABELS = {
@@ -614,4 +660,5 @@ GLUE_TASKS_NUM_LABELS = {
     "qnli": 2,
     "rte": 2,
     "wnli": 2,
+    "les-multi-ans": 2,
 }
