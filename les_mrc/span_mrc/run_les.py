@@ -419,6 +419,9 @@ def main():
                             ANSWER_MRC, BRIDGE_ENTITY_MRC))
 
     ## answer_mrc相关
+    # 是否使用bridge entity
+    parser.add_argument("--use_bridge_entity", action='store_true',
+                        help="Whether to concat the bridge entity to question.")
     # bridge entity是否拼接在question前面, False的话会拼接在question后面
     parser.add_argument("--bridge_entity_first", action='store_true',
                         help="Whether to concat bridge_entity in front of question.")
@@ -540,6 +543,11 @@ def main():
     parser.add_argument('--server_port', type=str, default='', help="Can be used for distant debugging.")
     args = parser.parse_args()
 
+    # Setup logging
+    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
+                        datefmt='%m/%d/%Y %H:%M:%S',
+                        level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
+
     # 检查task_name字段
     task_name_list = [ANSWER_MRC, BRIDGE_ENTITY_MRC]
     if args.task_name not in task_name_list:
@@ -555,11 +563,16 @@ def main():
             raise FileNotFoundError('when evaluating or predicting, you must have correct predict_file path')
 
     # 检查task_name和文件路径是否一致, 防止任务与数据不匹配
-    for file_path in [args.train_files, args.dev_files, args.test_files]:
+    for file_path in [args.train_file, args.predict_file]:
         if file_path is None:
             continue
-        if args.task_name not in os.dirname(file_path).split('/')[-1]:
+        if args.task_name not in os.path.dirname(file_path).split('/')[-1]:
             raise ValueError('Inconsistency between data_type and files')
+
+    # 检查bridge entity的状态
+    if args.task_name == ANSWER_MRC:
+        logger.warning('The bridge entity state: using: {}, entity first: {}, use_divide: {}'.format(
+        args.use_bridge_entity, args.bridge_entity_first, args.use_divide_for_bridge))
 
     # 设置cuda devices
     logger.warning('we set CUDA_VISIBLE_DEVICES: {}'.format(args.cuda_devices))
@@ -587,10 +600,6 @@ def main():
         args.n_gpu = 1
     args.device = device
 
-    # Setup logging
-    logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-                        datefmt = '%m/%d/%Y %H:%M:%S',
-                        level = logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
     logger.warning("Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
                     args.local_rank, device, args.n_gpu, bool(args.local_rank != -1), args.fp16)
 
