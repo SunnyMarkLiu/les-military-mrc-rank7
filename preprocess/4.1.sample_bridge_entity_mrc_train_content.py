@@ -22,19 +22,6 @@ def find_answer_in_docid(answer):
     return list(set([int(doc[-2:-1]) for doc in docs]))
 
 
-def calc_ceil_rougel(answer_text, sample):
-    # 计算抽取的 fake answer 以及对应的 ceil rougel
-    fake_answers = [sample['documents'][answer_label[0]]['content'][answer_label[1]: answer_label[2] + 1]
-                    for answer_label in sample['answer_labels']]
-    sample['fake_answers'] = fake_answers
-
-    if len(fake_answers) == 0:
-        sample['ceil_rougel'] = 0
-    else:
-        ceil_rougel = RougeL().add_inst(cand=''.join(fake_answers), ref=answer_text).get_score()
-        sample['ceil_rougel'] = ceil_rougel
-
-
 def cut_doc_where_answer_in(sample, ans_doc_id, ans_doc_id_idxs, max_train_content_len,
                             min_left_context_len, min_right_context_len):
     """
@@ -57,18 +44,11 @@ def cut_doc_where_answer_in(sample, ans_doc_id, ans_doc_id_idxs, max_train_conte
     new_ans_end_idx = new_ans_start_idx + (ans_end_idx - ans_start_idx)
 
     ans_doc['content'] = ans_doc['content'][context_start_idx: context_end_idx]
-    ans_doc['supported_para_mask'] = ans_doc['supported_para_mask'][context_start_idx: context_end_idx]
     # 特征更新
     # ans_doc[''] = ...
     sample['documents'][ans_doc_id] = ans_doc
     # 更新答案下标
-    answer_labels = []
-    for al in sample['answer_labels']:
-        if ans_doc_id == al[0]:
-            answer_labels.append((ans_doc_id, new_ans_start_idx, new_ans_end_idx))
-        else:
-            answer_labels.append(al)
-    sample['answer_labels'] = answer_labels
+    sample['bridging_entity_labels'] = (ans_doc_id, new_ans_start_idx, new_ans_end_idx)
 
 
 def sample_train_content(sample, max_train_content_len, min_left_context_len=100, min_right_context_len=50):
@@ -80,7 +60,11 @@ def sample_train_content(sample, max_train_content_len, min_left_context_len=100
         min_left_context_len: 答案左侧 context 的最小长度
         min_right_context_len：答案右侧 context 的最小长度
     """
-    answer_in_docs = {al[0]: (al[1], al[2]) for al in sample['answer_labels']}
+    al = sample['bridging_entity_labels']
+    if al:
+        answer_in_docs = {al[0]: (al[1], al[2])}
+    else:
+        answer_in_docs = {}
 
     for doc_id, doc in enumerate(sample['documents']):
         # 不包含答案的直接截断
@@ -94,43 +78,34 @@ def sample_train_content(sample, max_train_content_len, min_left_context_len=100
             # 左边 context 的长度稍短，答案从前面截断在前面的 max_train_content_len 内
             if end <= max_train_content_len - min_right_context_len:
                 doc['content'] = doc['content'][:max_train_content_len]
-                doc['supported_para_mask'] = doc['supported_para_mask'][:max_train_content_len]
             # 右边 context 的长度稍短，答案从后面截断在后面的 max_train_content_len 内
             elif len(doc['content']) - start + min_left_context_len <= max_train_content_len:
                 new_ans_start_idx = start - (len(doc['content']) - max_train_content_len)
                 new_ans_end_idx = new_ans_start_idx + (end - start)
 
                 doc['content'] = doc['content'][-max_train_content_len:]
-                doc['supported_para_mask'] = doc['supported_para_mask'][-max_train_content_len:]
 
                 # 更新答案下标
-                answer_labels = []
-                for al in sample['answer_labels']:
-                    if doc_id == al[0]:
-                        answer_labels.append((doc_id, new_ans_start_idx, new_ans_end_idx))
-                    else:
-                        answer_labels.append(al)
-                sample['answer_labels'] = answer_labels
+                sample['bridging_entity_labels'] = (doc_id, new_ans_start_idx, new_ans_end_idx)
             # 左边右边的长度都比较长，则以答案为基本中心进行截断
             else:
                 cut_doc_where_answer_in(sample, doc_id, answer_in_docs, max_train_content_len,
                                         min_left_context_len, min_right_context_len)
 
-    answer = sample['answer']
-    ans_in_docids = find_answer_in_docid(answer)
-    answer_texts = []
-    for ans_in_docid in ans_in_docids:
-        answer_strs = answer.split('@content{}@'.format(ans_in_docid))
-        for answer_str in answer_strs:
-            answer_str = answer_str.strip()  # important
-            # @content1@ 包裹的实际答案文本
-            if answer_str != '' and '@content' not in answer_str:
-                answer_str = answer_str.replace('content{}@'.format(ans_in_docid), '')
-                answer_texts.append(answer_str)
+    if sample['bridging_entity'] is not None:
+        bridging_entity_labels = sample['bridging_entity_labels']
+        sample['fake_bridging_entity'] = sample['documents'][bridging_entity_labels[0]]['content'] \
+                                                [bridging_entity_labels[1]: bridging_entity_labels[2] + 1]
 
-    # 拼接的答案文本
-    answer_text = ''.join(answer_texts)
-    calc_ceil_rougel(answer_text, sample)
+        if sample['fake_bridging_entity'] == '':
+            sample['ceil_rougel'] = 0
+        else:
+            ceil_rougel = RougeL().add_inst(cand=sample['fake_bridging_entity'].lower(), ref=sample['bridging_entity'].lower()).get_score()
+            sample['ceil_rougel'] = ceil_rougel
+    else:
+        sample['bridging_entity_labels'] = []
+        sample['fake_bridging_entity'] = None
+        sample['ceil_rougel'] = -1
 
 
 if __name__ == '__main__':

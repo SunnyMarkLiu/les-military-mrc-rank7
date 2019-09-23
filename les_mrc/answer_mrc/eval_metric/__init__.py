@@ -30,4 +30,5 @@ from eval_metric.dureader_eval import normalize
 __all__ = [
     'compute_bleu_rouge',
     'normalize',
+    'compute_rouge'
     ]

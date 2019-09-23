@@ -53,11 +53,9 @@ for rid, row in tqdm(train_df.iterrows(), total=train_df.shape[0]):
         paragraphs = [para.strip() for para in row['content{}'.format(docid)].split('  ')]
         paragraphs = [para for para in paragraphs if para != '']
 
-        supported_para_ids = []
 
         sample['documents'].append({
             'is_selected': is_selected,
-            'supported_para_ids': supported_para_ids,
             'title': row['title{}'.format(docid)],
             'paragraphs': paragraphs
         })

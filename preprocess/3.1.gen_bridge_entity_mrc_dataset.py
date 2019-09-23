@@ -2,17 +2,15 @@
 # _*_ coding: utf-8 _*_
 
 """
-根据筛选的段落，计算 start，end 下标
 
 @author: Qing Liu, sunnymarkliu@163.com
 @github: https://github.com/sunnymarkLiu
-@time  : 2019/9/6 16:39
+@time  : 2019/9/22 14:41
 """
 import sys
 sys.path.append('../')
 import re
 import json
-import numpy as np
 from utils.rouge import RougeL
 
 
@@ -78,6 +76,8 @@ def find_best_match_answer(answer, support_para):
     """
     找到 sub_text 在 content 覆盖度最大的开始和结束下标（细粒度）
     """
+    answer = answer.lower()
+    support_para = support_para.lower()
     if answer in support_para:
         best_start = support_para.index(answer)
         best_end = best_start + len(answer) - 1
@@ -124,21 +124,10 @@ def find_best_match_answer(answer, support_para):
     else:
         return best_start, best_end, best_score
 
-def calc_ceil_rougel(answer_text, sample):
-    # 计算抽取的 fake answer 以及对应的 ceil rougel
-    fake_answers = [sample['documents'][answer_label[0]]['content'][answer_label[1]: answer_label[2] + 1]
-                    for answer_label in sample['answer_labels']]
-    sample['fake_answers'] = fake_answers
 
-    if len(fake_answers) == 0:
-        sample['ceil_rougel'] = 0
-    else:
-        ceil_rougel = RougeL().add_inst(cand=''.join(fake_answers), ref=answer_text).get_score()
-        sample['ceil_rougel'] = ceil_rougel
-
-def gen_mrc_dataset(sample):
+def gen_bridging_entity_mrc_dataset(sample):
     """
-    生成全文本下的 MRC 数据集
+    生成全文本下的针对 bridging_entity 的 MRC 数据集
     """
     # 段落文本拼接成 content，以及对于的特征的合并
     for doc_id, doc in enumerate(sample['documents']):
@@ -146,11 +135,8 @@ def gen_mrc_dataset(sample):
         doc['content'] = ''.join(doc['paragraphs'])
         del doc['paragraphs']
 
-        if 'supported_para_ids' in doc:
-            del doc['supported_para_ids']
-
     # 对训练集定位答案的 start end 下标
-    if 'answer' not in sample:
+    if 'bridging_entity' not in sample:
         return
 
     # 根据 support paragraph 找到答案所在的 sub para
@@ -170,54 +156,48 @@ def gen_mrc_dataset(sample):
                 else:
                     supported_paras[sup_para_in_docid] = [(found_sup_para, sup_start, sup_end)]
 
-    answer = sample['answer']
-    ans_in_docids = find_answer_in_docid(answer)
-    answer_texts = []
-    # 可能存在跨 doc 的答案（dureader中表现为多答案的形式）
-    answer_labels = []
-    for ans_in_docid in ans_in_docids:
-        # 找到当前 doc 的支撑para信息，这些para中可能包含答案
-        doc_support_paras = supported_paras[ans_in_docid]   # [{'找到的最匹配的 support para', '最匹配的开始下标', '最匹配的结束下标'}]
+    bridging_entity = sample['bridging_entity']
 
-        # docid 的 support para mask
-        doc_sup_mask = np.array([0] * len(sample['documents'][ans_in_docid - 1]['content']))
-        for doc_support_para in doc_support_paras:
-            sup_start, sup_end = doc_support_para[1], doc_support_para[2]
-            doc_sup_mask[sup_start: sup_end + 1] = 1
+    # 不存在桥接实体的
+    if bridging_entity is None:
+        sample['bridging_entity_labels'] = []
+        sample['fake_bridging_entity'] = None
+        sample['ceil_rougel'] = -1
+        return
 
-        # 答案所在 support para 对应的 mask 向量
-        sample['documents'][ans_in_docid - 1]['supported_para_mask'] = doc_sup_mask.tolist()
-        # IMPORTANT:
-        # 答案几乎都在 supporting_paragraph 中，所以进行答案定位的时候，需要先根据 supporting_paragraph 缩小答案的搜索范围，
-        # 再在其中定位答案的实际开始和结束的下标，同时需要注意加上 supporting_paragraph 搜索下标的偏移 shifted_start
-        answer_strs = answer.split('@content{}@'.format(ans_in_docid))
-        for answer_str in answer_strs:
-            answer_str = answer_str.strip()  # important
-            # @content1@ 包裹的实际答案文本
-            if answer_str != '' and '@content' not in answer_str:
-                answer_str = answer_str.replace('content{}@'.format(ans_in_docid), '')
-                answer_texts.append(answer_str)
+    max_rougel = 0
+    best_start_in_sup_para = -1
+    best_end_in_sup_para = -1
+    best_sup_doc_i = None
+    best_sup_para_i = None
 
-                max_rougel = 0
-                best_start_in_sup_para = -1
-                best_end_in_sup_para = -1
-                best_sup_para_i = None
-                for sup_para_i, doc_support_para in enumerate(doc_support_paras):
-                    start_in_sup_para, end_in_sup_para, rougel = find_best_match_answer(answer_str, doc_support_para[0])
-                    if rougel > max_rougel:
-                        max_rougel = rougel
-                        best_start_in_sup_para = start_in_sup_para
-                        best_end_in_sup_para = end_in_sup_para
-                        best_sup_para_i = sup_para_i
+    bridging_entity_labels = []
+    for sup_para_in_docid in support_para_in_docids:
+        doc_support_paras = supported_paras[sup_para_in_docid]
 
-                if best_start_in_sup_para != -1 and best_end_in_sup_para != -1:
-                    start_label = best_start_in_sup_para + doc_support_paras[best_sup_para_i][1]
-                    end_label = start_label + (best_end_in_sup_para - best_start_in_sup_para)
-                    answer_labels.append((ans_in_docid - 1, start_label, end_label))
+        for sup_para_i, doc_support_para in enumerate(doc_support_paras):
+            start_in_sup_para, end_in_sup_para, rougel = find_best_match_answer(bridging_entity, doc_support_para[0])
+            if rougel > max_rougel:
+                max_rougel = rougel
+                best_start_in_sup_para = start_in_sup_para
+                best_end_in_sup_para = end_in_sup_para
+                best_sup_doc_i = sup_para_in_docid
+                best_sup_para_i = sup_para_i
 
-        sample['answer_labels'] = answer_labels
-        answer_text = ''.join(answer_texts)
-        calc_ceil_rougel(answer_text, sample)
+    if best_start_in_sup_para != -1 and best_end_in_sup_para != -1:
+        start_label = best_start_in_sup_para + supported_paras[best_sup_doc_i][best_sup_para_i][1]
+        end_label = start_label + (best_end_in_sup_para - best_start_in_sup_para)
+        bridging_entity_labels = (best_sup_doc_i - 1, start_label, end_label)
+
+    sample['bridging_entity_labels'] = bridging_entity_labels
+    sample['fake_bridging_entity'] = sample['documents'][bridging_entity_labels[0]]['content'] \
+                                            [bridging_entity_labels[1]: bridging_entity_labels[2] + 1]
+
+    if sample['fake_bridging_entity'] == '':
+        sample['ceil_rougel'] = 0
+    else:
+        ceil_rougel = RougeL().add_inst(cand=sample['fake_bridging_entity'].lower(), ref=bridging_entity.lower()).get_score()
+        sample['ceil_rougel'] = ceil_rougel
 
 
 if __name__ == '__main__':
@@ -227,5 +207,5 @@ if __name__ == '__main__':
 
         json_sample = json.loads(line.strip())
 
-        gen_mrc_dataset(json_sample)
+        gen_bridging_entity_mrc_dataset(json_sample)
         print(json.dumps(json_sample, ensure_ascii=False))
