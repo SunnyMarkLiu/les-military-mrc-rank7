@@ -6,6 +6,8 @@ RELOAD_MODEL_DIR="models/bert_wwm_BertForLes_test"
 
 python run_les.py \
     --cuda_devices 2,3 \
+    --task_name answer_mrc \
+    --bridge_entity_first \
     --model_type bert \
     --customer_model_class BertForLes \
     --model_name_or_path ${RELOAD_MODEL_DIR}/pytorch_model.bin \

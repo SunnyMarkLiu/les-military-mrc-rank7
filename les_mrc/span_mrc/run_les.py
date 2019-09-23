@@ -48,7 +48,8 @@ from utils_les import (read_squad_examples, convert_examples_to_features,
 # The follwing import is the official SQuAD evaluation script (2.0).
 # You can remove it from the dependencies if you are using this script outside of the library
 # We've added it here for automated tests (see examples/test_examples.py file)
-from utils_les_evaluate import evaluate_on_les
+from utils_les_evaluate import evaluate_on_les_answer, evaluate_on_les_bridge_entity
+from utils_les import ANSWER_MRC, BRIDGE_ENTITY_MRC
 
 from les_modeling import BertForLes, BertConcatTransformer, BertConcatBiGRU, BertSupportParaAnswerVerify
 
@@ -296,20 +297,20 @@ def evaluate(args, model, tokenizer, prefix="les"):
                         model.config.start_n_top, model.config.end_n_top,
                         args.version_2_with_negative, tokenizer, args.verbose_logging)
     else:
-        all_predictions = write_predictions(examples, features, all_results, args.n_best_size,
+        all_predictions = write_predictions(args.task_name, examples, features, all_results, args.n_best_size,
                             args.max_answer_length, args.do_lower_case, output_prediction_file,
                             output_nbest_file, output_null_log_odds_file, args.verbose_logging,
                             args.version_2_with_negative, args.null_score_diff_threshold)
 
-    # # Evaluate with the official SQuAD script
-    # evaluate_options = EVAL_OPTS(data_file=args.predict_file,
-    #                              pred_file=output_prediction_file,
-    #                              na_prob_file=output_null_log_odds_file)
-    # results = evaluate_on_squad(evaluate_options)
     if args.do_only_predict:
         results = {'info': 'No score when predict on test set'}
     else:
-        results, _ = evaluate_on_les(all_predictions, args.predict_file)
+        if args.task_name == ANSWER_MRC:
+            results, _ = evaluate_on_les_answer(all_predictions, args.predict_file)
+        elif args.task_name == BRIDGE_ENTITY_MRC:
+            results, _ = evaluate_on_les_bridge_entity(all_predictions, args.predict_file)
+        else:
+            raise ValueError('No such task_name: {}'.format(args.task_name))
     return results
 
 
@@ -328,11 +329,24 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
         data_type = 'train'
 
     if data_type == 'train':
-        cached_features_file = os.path.join(os.path.dirname(input_file), 'cached_{}_seqlen{}_querylen{}_answerlen{}_docstride{}_train_neg_sample_ratio{}'.format(
-            data_type, args.max_seq_length, args.max_query_length, args.max_answer_length, args.doc_stride, args.train_neg_sample_ratio))
+        cached_features_file = os.path.join(os.path.dirname(input_file),
+                                            'cached_{}_{}_seqlen{}_querylen{}_answerlen{}_docstride{}_train_neg_sample_ratio{}'.format(
+                                            args.task_name,
+                                            data_type,
+                                            args.max_seq_length,
+                                            args.max_query_length,
+                                            args.max_answer_length,
+                                            args.doc_stride,
+                                            args.train_neg_sample_ratio))
     else:
-        cached_features_file = os.path.join(os.path.dirname(input_file), 'cached_{}_seqlen{}_querylen{}_answerlen{}_docstride{}'.format(
-            data_type, args.max_seq_length, args.max_query_length, args.max_answer_length, args.doc_stride))
+        cached_features_file = os.path.join(os.path.dirname(input_file),
+                                            'cached_{}_{}_seqlen{}_querylen{}_answerlen{}_docstride{}'.format(
+                                            args.task_name,
+                                            data_type,
+                                            args.max_seq_length,
+                                            args.max_query_length,
+                                            args.max_answer_length,
+                                            args.doc_stride))
 
     examples = None
     features = None
@@ -342,24 +356,26 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
 
     if output_examples:
         logger.info("Reading examples from dataset file at %s", input_file)
-        examples = read_squad_examples(input_file=input_file,
-                                                is_training=not evaluate,
-                                                version_2_with_negative=args.version_2_with_negative)
+        examples = read_squad_examples(task_name=args.task_name,
+                                       input_file=input_file,
+                                       is_training=not evaluate,
+                                       version_2_with_negative=args.version_2_with_negative)
 
     if not features:
         logger.info("Creating features")
         if not examples:
             logger.info("Creating features from dataset file at %s", input_file)
-            examples = read_squad_examples(input_file=input_file,
-                                                    is_training=not evaluate,
-                                                    version_2_with_negative=args.version_2_with_negative)
-        features = convert_examples_to_features(examples=examples,
+            examples = read_squad_examples(task_name=args.task_name,
+                                           input_file=input_file,
+                                           is_training=not evaluate,
+                                           version_2_with_negative=args.version_2_with_negative)
+        features = convert_examples_to_features(args=args,
+                                                examples=examples,
                                                 tokenizer=tokenizer,
                                                 max_seq_length=args.max_seq_length,
                                                 doc_stride=args.doc_stride,
                                                 max_query_length=args.max_query_length,
-                                                is_training=not evaluate,
-                                                train_neg_sample_ratio=args.train_neg_sample_ratio)
+                                                is_training=not evaluate)
         if args.local_rank in [-1, 0]:
             logger.info("Saving features into cached file %s", cached_features_file)
             torch.save(features, cached_features_file)
@@ -397,7 +413,23 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
 def main():
     parser = argparse.ArgumentParser()
 
-    ## 文件路径
+    # 任务名称, 包括answer和bridge entity两种任务
+    parser.add_argument("--task_name", default=None, type=str, required=True,
+                        help="The name of the task to train selected in the list: [{}, {}]".format(
+                            ANSWER_MRC, BRIDGE_ENTITY_MRC))
+
+    ## answer_mrc相关
+    # 是否使用bridge entity
+    parser.add_argument("--use_bridge_entity", action='store_true',
+                        help="Whether to concat the bridge entity to question.")
+    # bridge entity是否拼接在question前面, False的话会拼接在question后面
+    parser.add_argument("--bridge_entity_first", action='store_true',
+                        help="Whether to concat bridge_entity in front of question.")
+    # bridge entity和question之间是否使用分隔符
+    parser.add_argument("--use_divide_for_bridge", action='store_true',
+                        help="Whether to use a DIVIDE token between bridge and question.")
+
+    # 文件路径
     parser.add_argument("--train_file", default=None, type=str, required=False,
                         help="SQuAD json for training. E.g., train-v1.1.json")
     parser.add_argument("--predict_file", default=None, type=str, required=False,
@@ -511,6 +543,37 @@ def main():
     parser.add_argument('--server_port', type=str, default='', help="Can be used for distant debugging.")
     args = parser.parse_args()
 
+    # Setup logging
+    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
+                        datefmt='%m/%d/%Y %H:%M:%S',
+                        level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
+
+    # 检查task_name字段
+    task_name_list = [ANSWER_MRC, BRIDGE_ENTITY_MRC]
+    if args.task_name not in task_name_list:
+        raise ValueError('task_name must be one of {}'.format(task_name_list))
+    logger.warning("The task name is `{}`, let's do it.".format(args.task_name))
+
+    # 检查应该有的文件是否存在
+    if args.do_train:
+        if args.train_file is None or not os.path.exists(args.train_file):
+            raise FileNotFoundError('when training, you must have correct train_file path')
+    if args.do_eval or args.evaluate_during_training or args.do_only_predict:
+        if args.predict_file is None or not os.path.exists(args.predict_file):
+            raise FileNotFoundError('when evaluating or predicting, you must have correct predict_file path')
+
+    # 检查task_name和文件路径是否一致, 防止任务与数据不匹配
+    for file_path in [args.train_file, args.predict_file]:
+        if file_path is None:
+            continue
+        if args.task_name not in os.path.dirname(file_path).split('/')[-1]:
+            raise ValueError('Inconsistency between data_type and files')
+
+    # 检查bridge entity的状态
+    if args.task_name == ANSWER_MRC:
+        logger.warning('The bridge entity state: using: {}, entity first: {}, use_divide: {}'.format(
+        args.use_bridge_entity, args.bridge_entity_first, args.use_divide_for_bridge))
+
     # 设置cuda devices
     logger.warning('we set CUDA_VISIBLE_DEVICES: {}'.format(args.cuda_devices))
     os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_devices
@@ -537,10 +600,6 @@ def main():
         args.n_gpu = 1
     args.device = device
 
-    # Setup logging
-    logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-                        datefmt = '%m/%d/%Y %H:%M:%S',
-                        level = logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
     logger.warning("Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
                     args.local_rank, device, args.n_gpu, bool(args.local_rank != -1), args.fp16)
 
@@ -580,9 +639,6 @@ def main():
     if args.customer_model_class.lower() == 'BertConcatBiGRU'.lower():
         model = model_class.from_pretrained(args.model_name_or_path, from_tf=bool('.ckpt' in args.model_name_or_path), config=config,
                                             bigru_hidden_size=bigru_hidden_size, bigru_dropout_prob=dropout_prob)
-    elif args.customer_model_class.lower() == 'BertSupportParaAnswerVerify'.lower():
-        model = model_class.from_pretrained(args.model_name_or_path, from_tf=bool('.ckpt' in args.model_name_or_path), config=config,
-                                            device=args.device)
     else:
         model = model_class.from_pretrained(args.model_name_or_path, from_tf=bool('.ckpt' in args.model_name_or_path), config=config)
 

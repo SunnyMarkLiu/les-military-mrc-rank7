@@ -1,11 +1,12 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset"
+DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset_yingzq"
 MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="bert_wwm_BertForLes_bridge"
+MODEL_COMMENT="bridge_entity_test"
 
 python run_les.py \
-    --cuda_devices 0,2,3 \
+    --cuda_devices 1,3 \
+    --task_name bridge_entity_mrc \
     --comment ${MODEL_COMMENT} \
     --model_type bert \
     --customer_model_class BertForLes \
@@ -16,8 +17,8 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file ${DATA_DIR}/train_max_content_len_1000.json \
-    --predict_file ${DATA_DIR}/dev.json \
+    --train_file ${DATA_DIR}/head100.json \
+    --predict_file ${DATA_DIR}/head100.json \
     --output_dir models/${MODEL_COMMENT} \
     --version_2_with_negative \
     --max_seq_length 512 \

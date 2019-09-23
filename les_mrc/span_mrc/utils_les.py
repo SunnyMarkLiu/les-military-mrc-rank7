@@ -24,12 +24,17 @@ import math
 import collections
 from io import open
 
-from pytorch_transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
+from pytorch_transformers.tokenization_bert import BasicTokenizer
 
 # Required by XLNet evaluation method to compute optimal threshold (see write_predictions_extended() method)
-from utils_les_evaluate import find_all_best_thresh_v2, make_qid_to_has_ans, get_raw_scores
+# from utils_les_evaluate import find_all_best_thresh_v2, make_qid_to_has_ans, get_raw_scores
 import random
 logger = logging.getLogger(__name__)
+
+
+# 任务定义
+ANSWER_MRC = "answer_mrc"
+BRIDGE_ENTITY_MRC = "bridge_entity_mrc"
 
 
 class SquadExample(object):
@@ -46,7 +51,8 @@ class SquadExample(object):
                  start_position=None,
                  end_position=None,
                  is_impossible=None,
-                 doc_position=None):
+                 doc_position=None,
+                 bridge_entity_text=None):
         self.qas_id = qas_id
         self.question_text = question_text
         self.doc_tokens = doc_tokens
@@ -55,6 +61,7 @@ class SquadExample(object):
         self.end_position = end_position
         self.is_impossible = is_impossible
         self.doc_position = doc_position
+        self.bridge_entity_text = bridge_entity_text
 
     def __str__(self):
         return self.__repr__()
@@ -114,10 +121,8 @@ class InputFeatures(object):
         self.doc_position = doc_position
 
 
-def read_squad_examples(input_file, is_training, version_2_with_negative):
+def read_squad_examples(task_name, input_file, is_training, version_2_with_negative):
     """Read a SQuAD json file into a list of SquadExample."""
-    # with open(input_file, "r", encoding='utf-8') as reader:
-    #     input_data = json.load(reader)["data"]
 
     def is_whitespace(c):
         if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
@@ -142,23 +147,35 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
             context_list = [doc['content'] for doc in sample['documents']]
 
             if is_training:
-                # answer_labels字段代表(docid, start, end)
-                if len(sample['answer_labels']) == 0:
-                    logger.warning('There is an empty answer training sample in les-json-data, line_id={}'.format(line_id + 1))
-                    continue
-                match_doc_ids = [label[0] for label in sample['answer_labels']]
-                sample['answer_labels'] = [[label[1], label[2]] for label in sample['answer_labels']]
+                # 注：answer_labels字段和bridging_entity_labels字段均代表(docid, start, end)
+
+                # answer task不存在没答案的sample，bridge entity task则存在
+                if task_name == ANSWER_MRC:
+                    if len(sample['answer_labels']) == 0:
+                        logger.warning('There is an empty answer training sample in les-json-data, line_id={}'.format(line_id + 1))
+                        continue
+                    match_doc_ids = [label[0] for label in sample['answer_labels']]
+                    sample['labels'] = [[label[1], label[2]] for label in sample['answer_labels']]
+                else:
+                    no_bridging_entity_label = len(sample['bridging_entity_labels']) == 0
+                    if no_bridging_entity_label:
+                        match_doc_ids = []
+                        sample['labels'] = []
+                    else:
+                        # 对于bridge entity其实label只有一个，为了代码统一用list套了一层
+                        match_doc_ids = [sample['bridging_entity_labels'][0]]
+                        sample['labels'] = [[sample['bridging_entity_labels'][1], sample['bridging_entity_labels'][2]]]
 
                 for doc_id in range(context_num):  # doc_id代表进行到一个例子中的第几个documents了
                     doc_tokens = []
                     char_to_word_offset = []
-                    # TODO 暂时word与char一一对应, 后续可能不同
+                    # word与char一一对应
                     doc_tokens = list(context_list[doc_id])
                     char_to_word_offset = list(range(len(doc_tokens)))
 
                     if doc_id in match_doc_ids:  # 该document有答案
                         count = 0  # 代表同一个document有多少个答案
-                        for match_id, (start, end) in zip(match_doc_ids, sample['answer_labels']):
+                        for match_id, (start, end) in zip(match_doc_ids, sample['labels']):
                             if doc_id != match_id: continue
                             # 有些例子的start, end不在有效范围内
                             if start > end or start not in char_to_word_offset or end not in char_to_word_offset:
@@ -179,7 +196,8 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                                 start_position=start_position,
                                 end_position=end_position,
                                 is_impossible=is_impossible,
-                                doc_position=doc_id)
+                                doc_position=doc_id,
+                                bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
                             examples.append(example)
                     else:
                         # 训练集中没有答案的document
@@ -197,14 +215,15 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                             start_position=start_position,
                             end_position=end_position,
                             is_impossible=is_impossible,
-                            doc_position=doc_id)
+                            doc_position=doc_id,
+                            bridge_entity_text="")
                         examples.append(example)
             else:
                 # not training
                 for doc_id in range(context_num):
                     doc_tokens = []
                     char_to_word_offset = []
-                    # TODO 暂时word与char一一对应, 后续可能不同
+                    # word与char一一对应
                     doc_tokens = list(context_list[doc_id])
                     char_to_word_offset = list(range(len(doc_tokens)))
 
@@ -222,18 +241,19 @@ def read_squad_examples(input_file, is_training, version_2_with_negative):
                         start_position=start_position,
                         end_position=end_position,
                         is_impossible=is_impossible,
-                        doc_position=doc_id)
+                        doc_position=doc_id,
+                        bridge_entity_text="")
                     examples.append(example)
     return examples
 
 
-def convert_examples_to_features(examples, tokenizer, max_seq_length,
+def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                                  doc_stride, max_query_length, is_training,
                                  cls_token_at_end=False,
                                  cls_token='[CLS]', sep_token='[SEP]', pad_token=0,
                                  sequence_a_segment_id=0, sequence_b_segment_id=1,
                                  cls_token_segment_id=0, pad_token_segment_id=0,
-                                 mask_padding_with_zero=True, train_neg_sample_ratio=0.5):
+                                 mask_padding_with_zero=True):
     """Loads a data file into a list of `InputBatch`s."""
 
     unique_id = 1000000000
@@ -241,7 +261,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     # max_N, max_M = 1024, 1024
     # f = np.zeros((max_N, max_M), dtype=np.float32)
 
-    # 对一些重要的未识别字符做一个映射
+    # 对一些重要的字符做一个映射
     convert_token_list = {
         '“': '"',
         '”': '"',
@@ -256,8 +276,9 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
         '–': '-',
         '﹟': '#',
         '㈠': '一',
-        ' ': '[unused1]',
-        '[SKIPPED]': '[UNK]'
+        ' ': '[unused1]',  # 保留空格保持长度一致
+        '[DIVIDE]': '[unused2]',  # entity和question的分隔符
+        '[SKIPPED]': '[UNK]'  # 保持长度一致
     }
 
     features = []
@@ -269,14 +290,6 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
         if log_steps > 0 and (example_index + 1) % log_steps == 0:
             logger.info('we have converted {} examples to features'.format(example_index + 1))
 
-        # if example_index % 100 == 0:
-        #     logger.info('Converting %s/%s pos %s neg %s', example_index, len(examples), cnt_pos, cnt_neg)
-
-        # question_text = example.question_text
-        # for key, value in convert_token_list.items():
-        #     question_text = question_text.replace(key, value)
-        # # TODO 这样似乎question中的英文没分开,也许会有问题
-        # query_tokens = tokenizer.tokenize(question_text)
         question_text = example.question_text
         query_tokens = []
         for token in question_text:
@@ -293,6 +306,33 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 query_tokens.append(sub_token)
 
         assert len(question_text) == len(query_tokens)
+
+        if args.task_name == ANSWER_MRC and args.use_bridge_entity and example.bridge_entity_text:
+            bridge_entity_text = example.bridge_entity_text
+            bridge_entity_tokens = []
+            for token in bridge_entity_text:
+                if token in convert_token_list:
+                    sub_tokens = [convert_token_list[token]]
+                else:
+                    sub_tokens = tokenizer.tokenize(token)
+                    if '[UNK]' in sub_tokens:
+                        unk_tokens_dict[token] += 1
+                    if len(sub_tokens) == 0:
+                        skipped_tokens_dict[token] += 1
+                        sub_tokens = [convert_token_list['[SKIPPED]']]  # 为了保持长度不变
+                for sub_token in sub_tokens:
+                    bridge_entity_tokens.append(sub_token)
+
+            assert len(bridge_entity_text) == len(bridge_entity_tokens)
+
+            if args.bridge_entity_first:
+                if args.use_divide_for_bridge:
+                    bridge_entity_tokens = bridge_entity_tokens + [convert_token_list['[DIVIDE]']]
+                query_tokens = bridge_entity_tokens + query_tokens
+            else:
+                if args.use_divide_for_bridge:
+                    bridge_entity_tokens = [convert_token_list['[DIVIDE]']] + bridge_entity_tokens
+                query_tokens = query_tokens + bridge_entity_tokens
 
         if len(query_tokens) > max_query_length:
             query_tokens = query_tokens[0:max_query_length]
@@ -317,10 +357,6 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
 
         # 在这里doc_tokens和all_doc_tokens长度应该完全一样
         assert len(example.doc_tokens) == len(all_doc_tokens)
-        for key, value in enumerate(tok_to_orig_index):
-            assert key == value
-        for key, value in enumerate(orig_to_tok_index):
-            assert key == value
 
         tok_start_position = None
         tok_end_position = None
@@ -463,13 +499,13 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
             # 1. 设置负样本丢弃概率阈值，random < 阈值，丢弃该负样本
             # 2. 根据该 question id 中可能包含多个答案的 doc_span，不同 qid 的doc_span也不同，按照包含答案和不包含答案的比例进行负样本采样
             if is_training and span_is_impossible:
-                if random.random() < train_neg_sample_ratio:
+                if random.random() < args.train_neg_sample_ratio:
                     continue
 
                 start_position = cls_index
                 end_position = cls_index
 
-            if example_index < 0:
+            if example_index < 20:
                 logger.info("*** Example ***")
                 logger.info("unique_id: %s" % (unique_id))
                 logger.info("qas_id: %s" % (example.qas_id))
@@ -495,8 +531,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                     answer_text = " ".join(tokens[start_position:(end_position + 1)])
                     logger.info("start_position: %d" % (start_position))
                     logger.info("end_position: %d" % (end_position))
-                    logger.info(
-                        "answer: %s" % (answer_text))
+                    logger.info("answer: %s" % (answer_text))
 
             features.append(
                 InputFeatures(
@@ -612,7 +647,7 @@ def _check_is_max_context(doc_spans, cur_span_index, position):
 RawResult = collections.namedtuple("RawResult",
                                    ["unique_id", "start_logits", "end_logits"])
 
-def write_predictions(all_examples, all_features, all_results, n_best_size,
+def write_predictions(task_name, all_examples, all_features, all_results, n_best_size,
                       max_answer_length, do_lower_case, output_prediction_file,
                       output_nbest_file, output_null_log_odds_file, verbose_logging,
                       version_2_with_negative, null_score_diff_threshold):
@@ -717,13 +752,13 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                 # tok_text = tok_text.replace(" ##", "")
                 # tok_text = tok_text.replace("##", "")
 
-                # TODO Clean whitespace, 这里空格暂时不处理
+                # Clean whitespace, 这里空格暂时不处理
                 # tok_text = tok_text.strip()
                 # tok_text = " ".join(tok_text.split())
                 # orig_text = " ".join(orig_tokens)
                 orig_text = "".join(orig_tokens)
 
-                # TODO 暂时不用get_final_text
+                # 暂时不用get_final_text
                 # final_text = get_final_text(tok_text, orig_text, do_lower_case, verbose_logging)
                 final_text = orig_text
                 if final_text in seen_predictions:
@@ -786,51 +821,69 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
         if not version_2_with_negative:
             all_predictions[example.qas_id] = nbest_json[0]["text"]
         else:
-            # predict "" iff the null score - the score of best non-null > threshold
             score_diff = score_null - best_non_null_entry.start_logit - (
                 best_non_null_entry.end_logit)
             scores_diff_json[example.qas_id] = score_diff
-            if score_diff > null_score_diff_threshold:
-                # all_predictions[example.qas_id] = ""
-                # TODO 先始终取example中最大的非空答案
+
+            if task_name == ANSWER_MRC:
+                # 始终取example中最大的非空答案
                 non_null_prob = best_non_null_entry.start_logit + best_non_null_entry.end_logit
                 all_predictions[example.qas_id] = [best_non_null_entry.text, non_null_prob]
             else:
-                # all_predictions[example.qas_id] = best_non_null_entry.text
-                non_null_prob = best_non_null_entry.start_logit + best_non_null_entry.end_logit
-                all_predictions[example.qas_id] = [best_non_null_entry.text, non_null_prob]
+                # predict "" iff the null score - the score of best non-null > threshold
+                if score_diff > null_score_diff_threshold:
+                    all_predictions[example.qas_id] = ["", score_null]
+                else:
+                    all_predictions[example.qas_id] = best_non_null_entry.text
+                    non_null_prob = best_non_null_entry.start_logit + best_non_null_entry.end_logit
+                    all_predictions[example.qas_id] = [best_non_null_entry.text, non_null_prob]
 
         all_nbest_json[example.qas_id] = nbest_json
 
-    all_samples = collections.defaultdict(list)
-    need_skippeed_list = [',', '.', '。']
-    for qas_id, nbest_json in all_nbest_json.items():
-        text = ''
-        prob = 0.0
-        logit = 0.0
-        for entry in nbest_json:
-            if entry['text'].strip() and entry['text'] not in need_skippeed_list:
-                text = entry['text'].strip()
-                logit = entry['start_logit'] + entry['end_logit']
-                prob = entry['probability']
-                break
-        all_samples[qas_id.split('##')[0]].append([text, logit, prob])
-    all_predictions = {}
-    for question_id, sample in all_samples.items():
-        sample = sorted(sample, key=lambda x: x[1], reverse=True)
-        all_predictions[question_id] = sample[0][0]
-        # 简单的多答案选择模块
-        # if sample[1][0] != '' and sample[1][2] > 0.1:
-        #     # 有可能具有多答案
-        #     if sample[1][0] in sample[0][0] or sample[0][0] in sample[1][0]:
-        #         continue
-        #     ans1 = normalize([sample[0][0]])
-        #     ans2 = normalize([sample[1][0]])
-        #     bleu_rouge = compute_bleu_rouge({'item': ans1}, {'item': ans2})
-        #     if bleu_rouge['Bleu-4'] > 0.5 or bleu_rouge['Rouge-L'] > 0.5:
-        #         continue
-        #     logger.warning('{} have multi-ans, take care of it'.format(question_id))
-        #     all_predictions[question_id] = all_predictions[question_id] + '#' + sample[1][0]
+    if task_name == ANSWER_MRC:
+        all_samples = collections.defaultdict(list)
+        need_skippeed_list = [',', '.', '。']
+        for qas_id, nbest_json in all_nbest_json.items():
+            text = ''
+            prob = 0.0
+            logit = 0.0
+            for entry in nbest_json:
+                if entry['text'].strip() and entry['text'] not in need_skippeed_list:
+                    text = entry['text'].strip()
+                    logit = entry['start_logit'] + entry['end_logit']
+                    prob = entry['probability']
+                    break
+            all_samples[qas_id.split('##')[0]].append([text, logit, prob])
+        all_predictions = {}
+        for question_id, sample in all_samples.items():
+            sample = sorted(sample, key=lambda x: x[1], reverse=True)
+            all_predictions[question_id] = sample[0][0]
+            # 简单的多答案选择模块
+            # if sample[1][0] != '' and sample[1][2] > 0.1:
+            #     # 有可能具有多答案
+            #     if sample[1][0] in sample[0][0] or sample[0][0] in sample[1][0]:
+            #         continue
+            #     ans1 = normalize([sample[0][0]])
+            #     ans2 = normalize([sample[1][0]])
+            #     bleu_rouge = compute_bleu_rouge({'item': ans1}, {'item': ans2})
+            #     if bleu_rouge['Bleu-4'] > 0.5 or bleu_rouge['Rouge-L'] > 0.5:
+            #         continue
+            #     logger.warning('{} have multi-ans, take care of it'.format(question_id))
+            #     all_predictions[question_id] = all_predictions[question_id] + '#' + sample[1][0]
+    else:
+        # 将多个example合成一个sample, 根据阈值决定是否有答案
+        all_samples = collections.defaultdict(list)
+        for qas_id, prediction in all_predictions.items():
+            all_samples[qas_id.split('##')[0]].append(prediction)
+        all_predictions = {}
+        for question_id, sample in all_samples.items():
+            sample = sorted(sample, key=lambda x: x[1], reverse=True)
+            for ex in sample:
+                if ex[0] != "":
+                    all_predictions[question_id] = ex[0]
+                    break
+            if question_id not in all_predictions:
+                all_predictions[question_id] = ""
 
     # # 将多个example合成一个sample
     # all_samples = collections.defaultdict(list)
@@ -871,182 +924,7 @@ def write_predictions_extended(all_examples, all_features, all_results, n_best_s
 
         Requires utils_squad_evaluate.py
     """
-    _PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
-        "PrelimPrediction",
-        ["feature_index", "start_index", "end_index",
-        "start_log_prob", "end_log_prob"])
-
-    _NbestPrediction = collections.namedtuple(  # pylint: disable=invalid-name
-        "NbestPrediction", ["text", "start_log_prob", "end_log_prob"])
-
-    logger.info("Writing predictions to: %s", output_prediction_file)
-    # logger.info("Writing nbest to: %s" % (output_nbest_file))
-
-    example_index_to_features = collections.defaultdict(list)
-    for feature in all_features:
-        example_index_to_features[feature.example_index].append(feature)
-
-    unique_id_to_result = {}
-    for result in all_results:
-        unique_id_to_result[result.unique_id] = result
-
-    all_predictions = collections.OrderedDict()
-    all_nbest_json = collections.OrderedDict()
-    scores_diff_json = collections.OrderedDict()
-
-    for (example_index, example) in enumerate(all_examples):
-        features = example_index_to_features[example_index]
-
-        prelim_predictions = []
-        # keep track of the minimum score of null start+end of position 0
-        score_null = 1000000  # large and positive
-
-        for (feature_index, feature) in enumerate(features):
-            result = unique_id_to_result[feature.unique_id]
-
-            cur_null_score = result.cls_logits
-
-            # if we could have irrelevant answers, get the min score of irrelevant
-            score_null = min(score_null, cur_null_score)
-
-            for i in range(start_n_top):
-                for j in range(end_n_top):
-                    start_log_prob = result.start_top_log_probs[i]
-                    start_index = result.start_top_index[i]
-
-                    j_index = i * end_n_top + j
-
-                    end_log_prob = result.end_top_log_probs[j_index]
-                    end_index = result.end_top_index[j_index]
-
-                    # We could hypothetically create invalid predictions, e.g., predict
-                    # that the start of the span is in the question. We throw out all
-                    # invalid predictions.
-                    if start_index >= feature.paragraph_len - 1:
-                        continue
-                    if end_index >= feature.paragraph_len - 1:
-                        continue
-
-                    if not feature.token_is_max_context.get(start_index, False):
-                        continue
-                    if end_index < start_index:
-                        continue
-                    length = end_index - start_index + 1
-                    if length > max_answer_length:
-                        continue
-
-                    prelim_predictions.append(
-                        _PrelimPrediction(
-                            feature_index=feature_index,
-                            start_index=start_index,
-                            end_index=end_index,
-                            start_log_prob=start_log_prob,
-                            end_log_prob=end_log_prob))
-
-        prelim_predictions = sorted(
-            prelim_predictions,
-            key=lambda x: (x.start_log_prob + x.end_log_prob),
-            reverse=True)
-
-        seen_predictions = {}
-        nbest = []
-        for pred in prelim_predictions:
-            if len(nbest) >= n_best_size:
-                break
-            feature = features[pred.feature_index]
-
-            # XLNet un-tokenizer
-            # Let's keep it simple for now and see if we need all this later.
-            #
-            # tok_start_to_orig_index = feature.tok_start_to_orig_index
-            # tok_end_to_orig_index = feature.tok_end_to_orig_index
-            # start_orig_pos = tok_start_to_orig_index[pred.start_index]
-            # end_orig_pos = tok_end_to_orig_index[pred.end_index]
-            # paragraph_text = example.paragraph_text
-            # final_text = paragraph_text[start_orig_pos: end_orig_pos + 1].strip()
-
-            # Previously used Bert untokenizer
-            tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1)]
-            orig_doc_start = feature.token_to_orig_map[pred.start_index]
-            orig_doc_end = feature.token_to_orig_map[pred.end_index]
-            orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end + 1)]
-            tok_text = tokenizer.convert_tokens_to_string(tok_tokens)
-
-            # Clean whitespace
-            tok_text = tok_text.strip()
-            tok_text = " ".join(tok_text.split())
-            orig_text = " ".join(orig_tokens)
-
-            final_text = get_final_text(tok_text, orig_text, tokenizer.do_lower_case,
-                                        verbose_logging)
-
-            if final_text in seen_predictions:
-                continue
-
-            seen_predictions[final_text] = True
-
-            nbest.append(
-                _NbestPrediction(
-                    text=final_text,
-                    start_log_prob=pred.start_log_prob,
-                    end_log_prob=pred.end_log_prob))
-
-        # In very rare edge cases we could have no valid predictions. So we
-        # just create a nonce prediction in this case to avoid failure.
-        if not nbest:
-            nbest.append(
-                _NbestPrediction(text="", start_log_prob=-1e6,
-                end_log_prob=-1e6))
-
-        total_scores = []
-        best_non_null_entry = None
-        for entry in nbest:
-            total_scores.append(entry.start_log_prob + entry.end_log_prob)
-            if not best_non_null_entry:
-                best_non_null_entry = entry
-
-        probs = _compute_softmax(total_scores)
-
-        nbest_json = []
-        for (i, entry) in enumerate(nbest):
-            output = collections.OrderedDict()
-            output["text"] = entry.text
-            output["probability"] = probs[i]
-            output["start_log_prob"] = entry.start_log_prob
-            output["end_log_prob"] = entry.end_log_prob
-            nbest_json.append(output)
-
-        assert len(nbest_json) >= 1
-        assert best_non_null_entry is not None
-
-        score_diff = score_null
-        scores_diff_json[example.qas_id] = score_diff
-        # note(zhiliny): always predict best_non_null_entry
-        # and the evaluation script will search for the best threshold
-        all_predictions[example.qas_id] = best_non_null_entry.text
-
-        all_nbest_json[example.qas_id] = nbest_json
-
-    with open(output_prediction_file, "w") as writer:
-        writer.write(json.dumps(all_predictions, indent=4) + "\n")
-
-    with open(output_nbest_file, "w") as writer:
-        writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
-
-    if version_2_with_negative:
-        with open(output_null_log_odds_file, "w") as writer:
-            writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
-
-    with open(orig_data_file, "r", encoding='utf-8') as reader:
-        orig_data = json.load(reader)["data"]
-
-    qid_to_has_ans = make_qid_to_has_ans(orig_data)
-    has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
-    no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
-    exact_raw, f1_raw = get_raw_scores(orig_data, all_predictions)
     out_eval = {}
-
-    find_all_best_thresh_v2(out_eval, all_predictions, exact_raw, f1_raw, scores_diff_json, qid_to_has_ans)
 
     return out_eval
 
