@@ -19,7 +19,7 @@ python run_les.py \
     --do_lower_case \
     --train_file ${DATA_DIR}/head100.json \
     --predict_file ${DATA_DIR}/head100.json \
-    --output_dir models/${MODEL_COMMENT} \
+    --output_dir bridge_entity_models/${MODEL_COMMENT} \
     --version_2_with_negative \
     --max_seq_length 512 \
     --max_query_length 64 \

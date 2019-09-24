@@ -216,7 +216,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                             end_position=end_position,
                             is_impossible=is_impossible,
                             doc_position=doc_id,
-                            bridge_entity_text="")
+                            bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
                         examples.append(example)
             else:
                 # not training
@@ -242,7 +242,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                         end_position=end_position,
                         is_impossible=is_impossible,
                         doc_position=doc_id,
-                        bridge_entity_text="")
+                        bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
                     examples.append(example)
     return examples
 

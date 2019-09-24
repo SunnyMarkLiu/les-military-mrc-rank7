@@ -101,3 +101,8 @@ models/
 runs/
 .DS_store
 *dict.txt
+input/
+notebook/*.json
+notebook*.csv
+answer_models/
+bridge_models/
