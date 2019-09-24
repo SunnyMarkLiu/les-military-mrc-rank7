@@ -13,7 +13,7 @@ import sys
 sys.path.append('../')
 import sys
 import json
-import fool
+import fool     # pip install foolnltk
 from utils.jieba_util import WordSegmentPOSKeywordExtractor
 from collections import Counter
 
