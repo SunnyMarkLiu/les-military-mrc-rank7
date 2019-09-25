@@ -197,7 +197,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                                 end_position=end_position,
                                 is_impossible=is_impossible,
                                 doc_position=doc_id,
-                                bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
+                                bridge_entity_text="")
+                            # bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
                             examples.append(example)
                     else:
                         # 训练集中没有答案的document
@@ -216,7 +217,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                             end_position=end_position,
                             is_impossible=is_impossible,
                             doc_position=doc_id,
-                            bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
+                            bridge_entity_text="")
+                        # bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
                         examples.append(example)
             else:
                 # not training
@@ -242,7 +244,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                         end_position=end_position,
                         is_impossible=is_impossible,
                         doc_position=doc_id,
-                        bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
+                        bridge_entity_text="")
+                    # bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
                     examples.append(example)
     return examples
 
@@ -505,7 +508,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 start_position = cls_index
                 end_position = cls_index
 
-            if example_index < 20:
+            if example_index < 0:
                 logger.info("*** Example ***")
                 logger.info("unique_id: %s" % (unique_id))
                 logger.info("qas_id: %s" % (example.qas_id))
