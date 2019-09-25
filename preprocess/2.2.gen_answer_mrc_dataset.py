@@ -153,7 +153,7 @@ def gen_mrc_dataset(sample):
     # 对训练集定位答案的 start end 下标
     if 'answer' not in sample:
         return
-    # print(json.dumps(sample, ensure_ascii=False))
+
     # 根据 support paragraph 找到答案所在的 sub para
     support_para_in_docids = find_answer_in_docid(sample['supporting_paragraph'])
 
@@ -170,7 +170,7 @@ def gen_mrc_dataset(sample):
                     supported_paras[sup_para_in_docid].append((found_sup_para, sup_start, sup_end))
                 else:
                     supported_paras[sup_para_in_docid] = [(found_sup_para, sup_start, sup_end)]
-    print(supported_paras)
+
     answer = sample['answer']
     ans_in_docids = find_answer_in_docid(answer)
     answer_texts = []
@@ -204,7 +204,6 @@ def gen_mrc_dataset(sample):
                 best_end_in_sup_para = -1
                 best_sup_para_i = None
                 for sup_para_i, doc_support_para in enumerate(doc_support_paras):
-                    print(answer_str)
                     start_in_sup_para, end_in_sup_para, rougel = find_best_match_answer(answer_str, doc_support_para[0])
                     if rougel > max_rougel:
                         max_rougel = rougel

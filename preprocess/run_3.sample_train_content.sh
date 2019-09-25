@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-max_doc_len=1000
-min_ceil_rougel=0.6
+max_doc_len=1024
+min_ceil_rougel=0.2
 
 bridge_entity_mrc_source_dir="../input/bridge_entity_mrc_dataset"
 bridge_entity_mrc_target_dir="../input/bridge_entity_mrc_dataset"
