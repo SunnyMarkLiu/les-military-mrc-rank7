@@ -1,11 +1,11 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset_yingzq"
-MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="bridge_entity_test"
+DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset/"
+MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
+MODEL_COMMENT="bridge_entity_mrc_BertForLes_no_back-trans"
 
 python run_les.py \
-    --cuda_devices 1,3 \
+    --cuda_devices 1,2,3 \
     --task_name bridge_entity_mrc \
     --comment ${MODEL_COMMENT} \
     --model_type bert \
@@ -17,14 +17,14 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file ${DATA_DIR}/head100.json \
-    --predict_file ${DATA_DIR}/head100.json \
+    --train_file ${DATA_DIR}/train_max_content_len_1024.json \
+    --predict_file ${DATA_DIR}/dev.json \
     --output_dir bridge_entity_models/${MODEL_COMMENT} \
     --version_2_with_negative \
     --max_seq_length 512 \
     --max_query_length 64 \
     --max_answer_length 20 \
-    --train_neg_sample_ratio 0.0 \
+    --train_neg_sample_ratio 0.2 \
     --per_gpu_train_batch_size 8 \
     --per_gpu_eval_batch_size 24 \
     --learning_rate 3e-5 \

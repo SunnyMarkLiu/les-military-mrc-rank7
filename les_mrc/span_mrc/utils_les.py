@@ -130,6 +130,9 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
         return False
 
     examples = []
+
+    total_question_title_pairs = set()
+
     with open(input_file) as fin:
         log_steps = 5000  # log打印间隔
         for line_id, line in enumerate(fin):
@@ -148,6 +151,39 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
 
             if is_training:
                 # 注：answer_labels字段和bridging_entity_labels字段均代表(docid, start, end)
+
+                # 判断 <question, title> pair 是否重复，如果重复则去掉，同时更新label的 docid（注意翻译数据没处理title，手动加上 BACK-TRANS 以区分）
+                labels = sample['answer_labels'] if task_name == ANSWER_MRC else [sample['bridging_entity_labels']]
+
+                ans_infoes = []
+                for ans_label in labels:
+                    # <doc title，start，end>
+                    ans_infoes.append((sample['documents'][ans_label[0]]['title'], ans_label[1], ans_label[2]))
+
+                nodup_documents = []
+                for doc_id, doc in enumerate(sample['documents']):
+                    if question_text + doc['title'] in total_question_title_pairs:
+                        continue
+                    else:
+                        total_question_title_pairs.add(question_text + doc['title'])
+                        nodup_documents.append(doc)
+
+                # 更新答案的 doc 下标
+                new_answer_labels = []
+                for ans_info in ans_infoes:
+                    for doc_id, doc in enumerate(nodup_documents):
+                        if ans_info[0] == doc['title']:
+                            new_answer_labels.append((doc_id, ans_info[1], ans_info[2]))
+
+                if task_name == ANSWER_MRC:
+                    sample['answer_labels'] = new_answer_labels
+                else:
+                    assert len(new_answer_labels) == 1
+                    sample['bridging_entity_labels'] = new_answer_labels[0]
+                sample['documents'] = nodup_documents
+
+                context_num = len(sample['documents'])
+                context_list = [doc['content'] for doc in sample['documents']]
 
                 # answer task不存在没答案的sample，bridge entity task则存在
                 if task_name == ANSWER_MRC:
