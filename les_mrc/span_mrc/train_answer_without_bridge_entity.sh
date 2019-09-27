@@ -1,8 +1,8 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/answer_mrc_dataset_0926"
+DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/answer_mrc_dataset"
 MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="answer_mrc_BertForLes_no_bridge-entity_no_back-trans_0926"
+MODEL_COMMENT="answer_mrc_BertForLes_no-bridge-entity_back-trans_rm-dup-ques-doc-pair_0927"
 
 python run_les.py \
     --cuda_devices 0,1,3 \
@@ -17,7 +17,8 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file ${DATA_DIR}/train_max_content_len_1024.json \
+    --with_back_trans \
+    --train_file ${DATA_DIR}/back_trans_aug_max_content_len_1024.json \
     --predict_file ${DATA_DIR}/dev.json \
     --output_dir answer_models/${MODEL_COMMENT} \
     --version_2_with_negative \
@@ -25,7 +26,7 @@ python run_les.py \
     --max_query_length 64 \
     --max_answer_length 110 \
     --train_neg_sample_ratio 0.0 \
-    --per_gpu_train_batch_size 8 \
+    --per_gpu_train_batch_size 7 \
     --per_gpu_eval_batch_size 24 \
     --learning_rate 3e-5 \
     --warmup_steps 5200 \

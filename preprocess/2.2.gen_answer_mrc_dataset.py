@@ -54,7 +54,7 @@ def find_best_match_support_para(support_text, doc_content):
 
     start = 0
     while start < len(doc_content) - window_len - 1:
-        while doc_content[start] not in support_para_chars:
+        while start < len(doc_content) and doc_content[start] not in support_para_chars:
             start += 1
 
         end = start + window_len

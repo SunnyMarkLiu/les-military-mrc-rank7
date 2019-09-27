@@ -94,8 +94,14 @@ def sample_train_content(sample, max_train_content_len, min_left_context_len=100
 
     if sample['bridging_entity'] is not None:
         bridging_entity_labels = sample['bridging_entity_labels']
-        sample['fake_bridging_entity'] = sample['documents'][bridging_entity_labels[0]]['content'] \
-                                                [bridging_entity_labels[1]: bridging_entity_labels[2] + 1]
+
+        if len(bridging_entity_labels) > 0:
+            sample['bridging_entity_labels'] = bridging_entity_labels
+            sample['fake_bridging_entity'] = sample['documents'][bridging_entity_labels[0]]['content'] \
+                [bridging_entity_labels[1]: bridging_entity_labels[2] + 1]
+        else:
+            sample['bridging_entity_labels'] = []
+            sample['fake_bridging_entity'] = ''
 
         if sample['fake_bridging_entity'] == '':
             sample['ceil_rougel'] = 0
@@ -119,5 +125,6 @@ if __name__ == '__main__':
         json_sample = json.loads(line.strip())
         sample_train_content(json_sample, max_train_content_len)
 
+        json_sample['question_id'] = 'bt_' + json_sample['question_id']
         if json_sample['ceil_rougel'] >= min_ceil_rougel or json_sample['ceil_rougel'] == -1:
             print(json.dumps(json_sample, ensure_ascii=False))

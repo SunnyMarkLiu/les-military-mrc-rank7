@@ -330,14 +330,15 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
 
     if data_type == 'train':
         cached_features_file = os.path.join(os.path.dirname(input_file),
-                                            'cached_{}_{}_seqlen{}_querylen{}_answerlen{}_docstride{}_train_neg_sample_ratio{}'.format(
+                                            'cached_{}_{}_seqlen{}_querylen{}_answerlen{}_docstride{}_train_neg_sample_ratio{}_back_trans_{}'.format(
                                             args.task_name,
                                             data_type,
                                             args.max_seq_length,
                                             args.max_query_length,
                                             args.max_answer_length,
                                             args.doc_stride,
-                                            args.train_neg_sample_ratio))
+                                            args.train_neg_sample_ratio,
+                                            args.with_back_trans))
     else:
         cached_features_file = os.path.join(os.path.dirname(input_file),
                                             'cached_{}_{}_seqlen{}_querylen{}_answerlen{}_docstride{}'.format(
@@ -430,6 +431,8 @@ def main():
                         help="Whether to use a DIVIDE token between bridge and question.")
 
     # 文件路径
+    parser.add_argument("--with_back_trans", action='store_true',
+                        help="augment the train datas using back translation.")
     parser.add_argument("--train_file", default=None, type=str, required=False,
                         help="SQuAD json for training. E.g., train-v1.1.json")
     parser.add_argument("--predict_file", default=None, type=str, required=False,

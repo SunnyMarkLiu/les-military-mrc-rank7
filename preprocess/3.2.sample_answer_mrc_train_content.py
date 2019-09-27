@@ -211,5 +211,6 @@ if __name__ == '__main__':
         json_sample = json.loads(line.strip())
         sample_train_content(json_sample, max_train_content_len)
 
+        json_sample['question_id'] = 'bt_' + json_sample['question_id']
         if json_sample['ceil_rougel'] >= min_ceil_rougel:
             print(json.dumps(json_sample, ensure_ascii=False))

@@ -132,6 +132,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
     examples = []
 
     total_question_title_pairs = set()
+    total_remove_cnt = 0
 
     with open(input_file) as fin:
         log_steps = 5000  # log打印间隔
@@ -157,8 +158,9 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
 
                 ans_infoes = []
                 for ans_label in labels:
-                    # <doc title，start，end>
-                    ans_infoes.append((sample['documents'][ans_label[0]]['title'], ans_label[1], ans_label[2]))
+                    if ans_label:
+                        # <doc title，start，end>
+                        ans_infoes.append((sample['documents'][ans_label[0]]['title'], ans_label[1], ans_label[2]))
 
                 nodup_documents = []
                 for doc_id, doc in enumerate(sample['documents']):
@@ -167,7 +169,9 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                     else:
                         total_question_title_pairs.add(question_text + doc['title'])
                         nodup_documents.append(doc)
-
+                if len(nodup_documents) < 5:
+                    total_remove_cnt += 5 - len(nodup_documents)
+                    logger.info('removed {} question-doc pairs for {}'.format(5 - len(nodup_documents), sample['question_id']))
                 # 更新答案的 doc 下标
                 new_answer_labels = []
                 for ans_info in ans_infoes:
@@ -177,9 +181,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
 
                 if task_name == ANSWER_MRC:
                     sample['answer_labels'] = new_answer_labels
-                else:
-                    assert len(new_answer_labels) == 1
-                    sample['bridging_entity_labels'] = new_answer_labels[0]
+
                 sample['documents'] = nodup_documents
 
                 context_num = len(sample['documents'])
@@ -283,6 +285,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                         bridge_entity_text="")
                     # bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
                     examples.append(example)
+
+    logger.info('we have removed {} question-doc pairs'.format(total_remove_cnt))
     return examples
 
 
