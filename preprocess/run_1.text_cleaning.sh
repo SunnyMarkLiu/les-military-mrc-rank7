@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-source_dir="../input_rollback_8315/raw/"
-target_dir="../input_rollback_8315/cleaned/"
+source_dir="../input/raw/"
+target_dir="../input/cleaned/"
 
 echo "cleaning train data..."
 nohup cat ${source_dir}split_train_00 |python 1.text_cleaning.py > ${target_dir}split_train_00 2>&1 &
