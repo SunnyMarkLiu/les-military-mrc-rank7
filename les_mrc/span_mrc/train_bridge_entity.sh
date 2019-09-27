@@ -1,8 +1,8 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset/"
+DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset"
 MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="bridge_entity_mrc_BertForLes_no-bridge-entity_back-trans_rm-dup-ques-doc-pair_0927"
+MODEL_COMMENT="bridge_entity_mrc_BertForLes_no-bridge-entity_back-trans_0928"
 
 python run_les.py \
     --cuda_devices 1,2,3 \

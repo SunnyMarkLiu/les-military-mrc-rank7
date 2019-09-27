@@ -351,6 +351,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
 
     examples = None
     features = None
+    logger.info('cached file: {}'.format(cached_features_file))
     if os.path.exists(cached_features_file) and not args.overwrite_cache:
         logger.info("Loading features from cached file %s", cached_features_file)
         features = torch.load(cached_features_file)

@@ -2,7 +2,7 @@
 set -ex
 DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/answer_mrc_dataset"
 MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="answer_mrc_BertForLes_no-bridge-entity_back-trans_rm-dup-ques-doc-pair_0927"
+MODEL_COMMENT="answer_mrc_BertForLes_no-bridge-entity_back-trans_0928"
 
 python run_les.py \
     --cuda_devices 0,1,3 \

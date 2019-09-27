@@ -118,12 +118,21 @@ if __name__ == '__main__':
     max_train_content_len = int(sys.argv[1])
     min_ceil_rougel = float(sys.argv[2])
 
+    # 不包含entity 的样本过多，删除掉2000个，内存不够
+    no_entity_count = 0
     for line in sys.stdin:
         if not line.startswith('{'):
             continue
 
         json_sample = json.loads(line.strip())
         sample_train_content(json_sample, max_train_content_len)
+
+        if json_sample['ceil_rougel'] == -1:
+
+            if random.random() < 0.5:
+                no_entity_count += 1
+                if no_entity_count < 2000:
+                    continue
 
         json_sample['question_id'] = 'bt_' + json_sample['question_id']
         if json_sample['ceil_rougel'] >= min_ceil_rougel or json_sample['ceil_rougel'] == -1:
