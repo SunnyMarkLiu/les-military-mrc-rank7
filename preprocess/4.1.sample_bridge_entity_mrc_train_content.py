@@ -110,7 +110,6 @@ def sample_train_content(sample, max_train_content_len, min_left_context_len=100
 
 if __name__ == '__main__':
     max_train_content_len = int(sys.argv[1])
-    min_ceil_rougel = float(sys.argv[2])
 
     for line in sys.stdin:
         if not line.startswith('{'):
@@ -118,6 +117,4 @@ if __name__ == '__main__':
 
         json_sample = json.loads(line.strip())
         sample_train_content(json_sample, max_train_content_len)
-
-        if json_sample['ceil_rougel'] >= min_ceil_rougel or json_sample['ceil_rougel'] == -1:
-            print(json.dumps(json_sample, ensure_ascii=False))
+        print(json.dumps(json_sample, ensure_ascii=False))
