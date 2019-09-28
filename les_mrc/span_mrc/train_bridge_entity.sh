@@ -1,8 +1,8 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset"
-MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="bridge_entity_mrc_BertForLes_no-bridge-entity_back-trans_0928"
+DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset"
+MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
+MODEL_COMMENT="bridge_entity_mrc_wwm_BertForLes_data-rollback-to8315_add-3251-back-trans_0928"
 
 python run_les.py \
     --cuda_devices 1,2,3 \
@@ -18,7 +18,7 @@ python run_les.py \
     --evaluate_during_training \
     --do_lower_case \
     --with_back_trans \
-    --train_file ${DATA_DIR}/back_trans_aug_max_content_len_1024.json \
+    --train_file ${DATA_DIR}/augment_train_max_content_len_1000.json \
     --predict_file ${DATA_DIR}/dev.json \
     --output_dir bridge_entity_models/${MODEL_COMMENT} \
     --version_2_with_negative \
