@@ -11,7 +11,7 @@
 import json
 
 # ----------- test -----------
-with open('bridge_models/bridge_mrc_wwm_BertForLes/checkpoint-best/predictions_checkpoint_test.json') as f:
+with open('bridge_entity_models/bridge_entity_mrc_wwm_BertForLes_data-rollback-to8315_add-3251-back-trans_0928/predictions_checkpoint_test.json') as f:
     test_bridge_entity = json.load(f)
 
 with open('../../input/answer_mrc_dataset/add_pred_bridging_entity_test_r0.json', 'w', encoding='utf8') as fout:
@@ -22,7 +22,7 @@ with open('../../input/answer_mrc_dataset/add_pred_bridging_entity_test_r0.json'
             fout.write(json.dumps(sample, ensure_ascii=False) + '\n')
 
 # ----------- dev -----------
-with open('bridge_models/bridge_mrc_wwm_BertForLes/checkpoint-best/predictions_checkpoint_dev.json') as f:
+with open('bridge_entity_models/bridge_entity_mrc_wwm_BertForLes_data-rollback-to8315_add-3251-back-trans_0928/predictions_checkpoint_dev.json') as f:
     dev_bridge_entity = json.load(f)
 
 with open('../../input/answer_mrc_dataset/add_pred_bridging_entity_dev.json', 'w', encoding='utf8') as fout:
