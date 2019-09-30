@@ -2,7 +2,7 @@
 set -ex
 DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset"
 MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
-RELOAD_MODEL_DIR="bridge_entity_models/bridge_entity_mrc_wwm_BertForLes_data-rollback-to8315_add-3251-back-trans_0928/"
+RELOAD_MODEL_DIR="bridge_entity_models/bridge_entity_mrc_wwm_BertForLes/"
 
 python run_les.py \
     --cuda_devices 0,1,2,3 \
@@ -24,3 +24,4 @@ python run_les.py \
     --per_gpu_eval_batch_size 64 \
     --doc_stride 128 \
     --logging_steps 0 \
+    --null_score_diff_threshold 8

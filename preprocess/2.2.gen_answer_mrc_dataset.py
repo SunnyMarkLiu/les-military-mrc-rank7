@@ -3,6 +3,7 @@
 
 """
 根据筛选的段落，计算 start，end 下标
+
 @author: Qing Liu, sunnymarkliu@163.com
 @github: https://github.com/sunnymarkLiu
 @time  : 2019/9/6 16:39
@@ -77,12 +78,16 @@ def find_best_match_answer(answer, support_para):
     """
     找到 sub_text 在 content 覆盖度最大的开始和结束下标（细粒度）
     """
+    answer = answer.lower()
+    support_para = support_para.lower()
+
     if answer in support_para:
         best_start = support_para.index(answer)
         best_end = best_start + len(answer) - 1
         return best_start, best_end, 1
 
-    if answer.endswith('。') and answer[:-1] in support_para:
+    if (answer.endswith('。') or answer.endswith('；') or answer.endswith('，') or answer.endswith('！')) \
+            and answer[:-1] in support_para:
         answer = answer[:-1]
         best_start = support_para.index(answer)
         best_end = best_start + len(answer) - 1
@@ -102,11 +107,11 @@ def find_best_match_answer(answer, support_para):
     best_start = -1
     best_end = len(support_para) - 1
 
-    for start_idx in range(0, len(support_para) - len(answer)):
+    for start_idx in range(0, len(support_para)):
         if support_para[start_idx] not in support_para_chars:
             continue
 
-        for end_idx in range(best_end, start_idx - 1, -1):
+        for end_idx in range(len(support_para)-1, start_idx - 1, -1):
             if support_para[end_idx] not in support_para_chars:
                 continue
 
@@ -132,7 +137,7 @@ def calc_ceil_rougel(answer_text, sample):
     if len(fake_answers) == 0:
         sample['ceil_rougel'] = 0
     else:
-        ceil_rougel = RougeL().add_inst(cand=''.join(fake_answers), ref=answer_text).get_score()
+        ceil_rougel = RougeL().add_inst(cand=''.join(fake_answers).lower(), ref=answer_text.lower()).get_score()
         sample['ceil_rougel'] = ceil_rougel
 
 def gen_mrc_dataset(sample):
@@ -144,9 +149,6 @@ def gen_mrc_dataset(sample):
         if 'content' in doc: continue
         doc['content'] = ''.join(doc['paragraphs'])
         del doc['paragraphs']
-
-        if 'supported_para_ids' in doc:
-            del doc['supported_para_ids']
 
     # 对训练集定位答案的 start end 下标
     if 'answer' not in sample:

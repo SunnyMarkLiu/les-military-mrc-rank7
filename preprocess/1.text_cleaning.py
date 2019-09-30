@@ -92,6 +92,7 @@ remove_regx_map = collections.OrderedDict({
     r'图\d+': '',
     r'\(记者[^\)]*\){1}': '',
     r'转自铁血社区': '',
+    r'2019优选加盟：一点点奶茶，四季经营无淡季广告2019优选加盟：一点点奶茶，四季经营无淡季': '',
     r'０': '0', r'１': '1', r'２': '2', r'３': '3', r'４': '4',
     r'５': '4', r'６': '6', r'７': '7', r'８': '8', r'９': '9',
     r'．': '.'
@@ -128,8 +129,19 @@ def clean_sample(sample):
     sample['keyword'] = clean_text(sample['keyword'])
     if 'answer' in sample:
         sample['answer'] = clean_text(sample['answer'], is_supporting_paragraph=True)
+        sample['answer'] = sample['answer'].replace('@content1@content','@content1@@content') \
+            .replace('@content2@content', '@content2@@content') \
+            .replace('@content3@content', '@content3@@content') \
+            .replace('@content4@content', '@content4@@content') \
+            .replace('@content5@content', '@content5@@content')
+
     if 'supporting_paragraph' in sample:
         sample['supporting_paragraph'] = clean_text(sample['supporting_paragraph'], is_supporting_paragraph=True)
+        sample['supporting_paragraph'] = sample['supporting_paragraph'].replace('@content1@content', '@content1@@content') \
+                                            .replace('@content2@content', '@content2@@content') \
+                                            .replace('@content3@content', '@content3@@content') \
+                                            .replace('@content4@content', '@content4@@content') \
+                                            .replace('@content5@content', '@content5@@content')
 
     for document in sample['documents']:
         document['paragraphs'] = [clean_text(para) for para in document['paragraphs']]

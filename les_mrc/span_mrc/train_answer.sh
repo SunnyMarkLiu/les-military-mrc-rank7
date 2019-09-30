@@ -2,7 +2,7 @@
 set -ex
 DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/answer_mrc_dataset"
 MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="answer_mrc_wwm_BertForLes_data-rollback-to8315_add-3251-back-trans_0928"
+MODEL_COMMENT="answer_mrc_wwm_BertForLes"
 
 python run_les.py \
     --cuda_devices 0,1,3 \
@@ -17,8 +17,7 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --with_back_trans \
-    --train_file ${DATA_DIR}/augment_train_max_content_len_1000.json \
+    --train_file ${DATA_DIR}/train_max_content_len_1024.json \
     --predict_file ${DATA_DIR}/dev.json \
     --output_dir answer_models/${MODEL_COMMENT} \
     --version_2_with_negative \
@@ -26,7 +25,7 @@ python run_les.py \
     --max_query_length 64 \
     --max_answer_length 110 \
     --train_neg_sample_ratio 0.0 \
-    --per_gpu_train_batch_size 7 \
+    --per_gpu_train_batch_size 8 \
     --per_gpu_eval_batch_size 24 \
     --learning_rate 3e-5 \
     --warmup_steps 5200 \
@@ -36,4 +35,4 @@ python run_les.py \
     --doc_stride 128 \
     --logging_steps 200 \
     --save_steps 8000 \
-    --eval_steps 4000 \
+    --eval_steps 8000 \
