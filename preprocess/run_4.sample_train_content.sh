@@ -10,5 +10,6 @@ nohup cat ${bridge_entity_mrc_source_dir}/train.json |python 4.1.sample_bridge_e
 
 answer_mrc_source_dir="../input/answer_mrc_dataset"
 answer_mrc_target_dir="../input/answer_mrc_dataset"
+min_ceil_rougel=-1
 
-nohup cat ${answer_mrc_source_dir}/train.json |python 4.2.sample_answer_mrc_train_content.py ${max_doc_len} > ${answer_mrc_target_dir}/train_max_content_len_${max_doc_len}.json 2>&1 &
+nohup cat ${answer_mrc_source_dir}/train.json |python 4.2.sample_answer_mrc_train_content.py ${max_doc_len} ${min_ceil_rougel} > ${answer_mrc_target_dir}/train_max_content_len_${max_doc_len}.json 2>&1 &
