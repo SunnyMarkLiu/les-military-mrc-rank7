@@ -26,7 +26,7 @@ python run_les.py \
     --max_query_length 64 \
     --max_answer_length 20 \
     --train_neg_sample_ratio 0.0 \
-    --per_gpu_train_batch_size 7 \
+    --per_gpu_train_batch_size 8 \
     --per_gpu_eval_batch_size 24 \
     --learning_rate 3e-5 \
     --warmup_steps 5200 \

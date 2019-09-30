@@ -420,17 +420,6 @@ def main():
                         help="The name of the task to train selected in the list: [{}, {}]".format(
                             ANSWER_MRC, BRIDGE_ENTITY_MRC))
 
-    ## answer_mrc相关
-    # 是否使用bridge entity
-    parser.add_argument("--use_bridge_entity", action='store_true',
-                        help="Whether to concat the bridge entity to question.")
-    # bridge entity是否拼接在question前面, False的话会拼接在question后面
-    parser.add_argument("--bridge_entity_first", action='store_true',
-                        help="Whether to concat bridge_entity in front of question.")
-    # bridge entity和question之间是否使用分隔符
-    parser.add_argument("--use_divide_for_bridge", action='store_true',
-                        help="Whether to use a DIVIDE token between bridge and question.")
-
     # 文件路径
     parser.add_argument("--with_back_trans", action='store_true',
                         help="augment the train datas using back translation.")
@@ -572,11 +561,6 @@ def main():
             continue
         if args.task_name not in os.path.dirname(file_path).split('/')[-1]:
             raise ValueError('Inconsistency between data_type and files')
-
-    # 检查bridge entity的状态
-    if args.task_name == ANSWER_MRC:
-        logger.warning('The bridge entity state: using: {}, entity first: {}, use_divide: {}'.format(
-        args.use_bridge_entity, args.bridge_entity_first, args.use_divide_for_bridge))
 
     # 设置cuda devices
     logger.warning('we set CUDA_VISIBLE_DEVICES: {}'.format(args.cuda_devices))

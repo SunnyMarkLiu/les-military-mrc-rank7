@@ -7,12 +7,9 @@ RELOAD_MODEL_DIR="answer_models/answer_mrc_wwm_BertForLes_data-rollback-to8315_a
 python run_les.py \
     --cuda_devices 0,1,2,3 \
     --task_name answer_mrc \
-    --use_bridge_entity \
-    --bridge_entity_first \
-    --use_divide_for_bridge \
     --model_type bert \
     --customer_model_class BertForLes \
-    --model_name_or_path ${MODEL_DIR}/pytorch_model.bin \
+    --model_name_or_path ${RELOAD_MODEL_DIR}/pytorch_model.bin \
     --config_name ${MODEL_DIR}/bert_config.json \
     --tokenizer_name ${MODEL_DIR}/vocab.txt \
     --do_eval \

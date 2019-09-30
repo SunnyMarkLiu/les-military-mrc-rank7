@@ -51,8 +51,7 @@ class SquadExample(object):
                  start_position=None,
                  end_position=None,
                  is_impossible=None,
-                 doc_position=None,
-                 bridge_entity_text=None):
+                 doc_position=None):
         self.qas_id = qas_id
         self.question_text = question_text
         self.doc_tokens = doc_tokens
@@ -61,7 +60,6 @@ class SquadExample(object):
         self.end_position = end_position
         self.is_impossible = is_impossible
         self.doc_position = doc_position
-        self.bridge_entity_text = bridge_entity_text
 
     def __str__(self):
         return self.__repr__()
@@ -130,10 +128,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
         return False
 
     examples = []
-
-    total_question_title_pairs = set()
-    total_remove_cnt = 0
-
     with open(input_file) as fin:
         log_steps = 5000  # log打印间隔
         for line_id, line in enumerate(fin):
@@ -152,40 +146,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
 
             if is_training:
                 # 注：answer_labels字段和bridging_entity_labels字段均代表(docid, start, end)
-
-                # # 判断 <question, title> pair 是否重复，如果重复则去掉，同时更新label的 docid（注意翻译数据没处理title，手动加上 BACK-TRANS 以区分）
-                # labels = sample['answer_labels'] if task_name == ANSWER_MRC else [sample['bridging_entity_labels']]
-                #
-                # ans_infoes = []
-                # for ans_label in labels:
-                #     if ans_label:
-                #         # <doc title，start，end>
-                #         ans_infoes.append((sample['documents'][ans_label[0]]['title'], ans_label[1], ans_label[2]))
-                #
-                # nodup_documents = []
-                # for doc_id, doc in enumerate(sample['documents']):
-                #     if question_text + doc['title'] in total_question_title_pairs:
-                #         continue
-                #     else:
-                #         total_question_title_pairs.add(question_text + doc['title'])
-                #         nodup_documents.append(doc)
-                # if len(nodup_documents) < 5:
-                #     total_remove_cnt += 5 - len(nodup_documents)
-                #     logger.info('removed {} question-doc pairs for {}'.format(5 - len(nodup_documents), sample['question_id']))
-                # # 更新答案的 doc 下标
-                # new_answer_labels = []
-                # for ans_info in ans_infoes:
-                #     for doc_id, doc in enumerate(nodup_documents):
-                #         if ans_info[0] == doc['title']:
-                #             new_answer_labels.append((doc_id, ans_info[1], ans_info[2]))
-                #
-                # if task_name == ANSWER_MRC:
-                #     sample['answer_labels'] = new_answer_labels
-                #
-                # sample['documents'] = nodup_documents
-                #
-                # context_num = len(sample['documents'])
-                # context_list = [doc['content'] for doc in sample['documents']]
 
                 # answer task不存在没答案的sample，bridge entity task则存在
                 if task_name == ANSWER_MRC:
@@ -234,9 +194,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                                 start_position=start_position,
                                 end_position=end_position,
                                 is_impossible=is_impossible,
-                                doc_position=doc_id,
-                                bridge_entity_text="")
-                            # bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
+                                doc_position=doc_id)
                             examples.append(example)
                     else:
                         # 训练集中没有答案的document
@@ -254,9 +212,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                             start_position=start_position,
                             end_position=end_position,
                             is_impossible=is_impossible,
-                            doc_position=doc_id,
-                            bridge_entity_text="")
-                        # bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
+                            doc_position=doc_id)
                         examples.append(example)
             else:
                 # not training
@@ -281,12 +237,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                         start_position=start_position,
                         end_position=end_position,
                         is_impossible=is_impossible,
-                        doc_position=doc_id,
-                        bridge_entity_text="")
-                    # bridge_entity_text=sample['bridging_entity'] if task_name == ANSWER_MRC else "")
+                        doc_position=doc_id)
                     examples.append(example)
-
-    logger.info('we have removed {} question-doc pairs'.format(total_remove_cnt))
     return examples
 
 
@@ -320,7 +272,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
         '﹟': '#',
         '㈠': '一',
         ' ': '[unused1]',  # 保留空格保持长度一致
-        '[DIVIDE]': '[unused2]',  # entity和question的分隔符
         '[SKIPPED]': '[UNK]'  # 保持长度一致
     }
 
@@ -350,33 +301,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
 
         assert len(question_text) == len(query_tokens)
 
-        if args.task_name == ANSWER_MRC and args.use_bridge_entity and example.bridge_entity_text:
-            bridge_entity_text = example.bridge_entity_text
-            bridge_entity_tokens = []
-            for token in bridge_entity_text:
-                if token in convert_token_list:
-                    sub_tokens = [convert_token_list[token]]
-                else:
-                    sub_tokens = tokenizer.tokenize(token)
-                    if '[UNK]' in sub_tokens:
-                        unk_tokens_dict[token] += 1
-                    if len(sub_tokens) == 0:
-                        skipped_tokens_dict[token] += 1
-                        sub_tokens = [convert_token_list['[SKIPPED]']]  # 为了保持长度不变
-                for sub_token in sub_tokens:
-                    bridge_entity_tokens.append(sub_token)
-
-            assert len(bridge_entity_text) == len(bridge_entity_tokens)
-
-            if args.bridge_entity_first:
-                if args.use_divide_for_bridge:
-                    bridge_entity_tokens = bridge_entity_tokens + [convert_token_list['[DIVIDE]']]
-                query_tokens = bridge_entity_tokens + query_tokens
-            else:
-                if args.use_divide_for_bridge:
-                    bridge_entity_tokens = [convert_token_list['[DIVIDE]']] + bridge_entity_tokens
-                query_tokens = query_tokens + bridge_entity_tokens
-
         if len(query_tokens) > max_query_length:
             query_tokens = query_tokens[0:max_query_length]
 
@@ -400,6 +324,10 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
 
         # 在这里doc_tokens和all_doc_tokens长度应该完全一样
         assert len(example.doc_tokens) == len(all_doc_tokens)
+        for key, value in enumerate(tok_to_orig_index):
+            assert key == value
+        for key, value in enumerate(orig_to_tok_index):
+            assert key == value
 
         tok_start_position = None
         tok_end_position = None
@@ -601,14 +529,14 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
     logger.warning('######print unk and skipped tokens with their counts######')
     logger.warning('the unk tokens is : {}'.format(unk_tokens_dict))
     logger.warning('the skipped tokens is : {}'.format(skipped_tokens_dict))
-    unk_file = '{}_unk_tokens_dict.txt'.format('train' if is_training else 'predict')
-    skipped_file = '{}_skipped_tokens_dict.txt'.format('train' if is_training else 'predict')
-    with open(unk_file, 'w') as fout:
-        for token, cnt in unk_tokens_dict.items():
-            fout.write('{}  {}\n'.format(token, cnt))
-    with open(skipped_file, 'w') as fout:
-        for token, cnt in skipped_tokens_dict.items():
-            fout.write('{}  {}\n'.format(token, cnt))
+    # unk_file = '{}_unk_tokens_dict.txt'.format('train' if is_training else 'predict')
+    # skipped_file = '{}_skipped_tokens_dict.txt'.format('train' if is_training else 'predict')
+    # with open(unk_file, 'w') as fout:
+    #     for token, cnt in unk_tokens_dict.items():
+    #         fout.write('{}  {}\n'.format(token, cnt))
+    # with open(skipped_file, 'w') as fout:
+    #     for token, cnt in skipped_tokens_dict.items():
+    #         fout.write('{}  {}\n'.format(token, cnt))
 
     return features
 
@@ -885,7 +813,7 @@ def write_predictions(task_name, all_examples, all_features, all_results, n_best
 
     if task_name == ANSWER_MRC:
         all_samples = collections.defaultdict(list)
-        need_skippeed_list = [',', '.', '。']
+        need_skippeed_list = [',', '，', '.', '。']
         for qas_id, nbest_json in all_nbest_json.items():
             text = ''
             prob = 0.0
