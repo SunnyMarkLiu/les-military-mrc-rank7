@@ -62,8 +62,13 @@ def extract_match_features(sample):
             doc['mean_cos_dist_5gram'].extend([mean_cos_dist_5gram] * sent_len)
             doc['mean_leve_dist_5gram'].extend([mean_leve_dist_5gram] * sent_len)
 
+def num_2_str(num):
+    if num == 0: return '0'
+    elif num == 1: return '1'
+    elif num == 2: return '2'
+    else: return str(num)
 
-def clean(sample):
+def reduce_memory(sample):
     """
     去除不用的字段
     """
@@ -82,27 +87,27 @@ def clean(sample):
         doc['char_in_que'] = ','.join(['{}'.format(x) for x in doc['char_in_que']])
         doc['char_entity'] = ','.join(doc['char_entity'])
 
-        doc['levenshtein_dist'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['levenshtein_dist']])
-        doc['longest_match_size'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['longest_match_size']])
-        doc['longest_match_ratio'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['longest_match_ratio']])
-        doc['compression_dist'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['compression_dist']])
-        doc['jaccard_coef'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['jaccard_coef']])
-        doc['dice_dist'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['dice_dist']])
-        doc['countbased_cos_distance'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['countbased_cos_distance']])
-        doc['fuzzy_matching_ratio'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['fuzzy_matching_ratio']])
-        doc['fuzzy_matching_partial_ratio'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['fuzzy_matching_partial_ratio']])
-        doc['fuzzy_matching_token_sort_ratio'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['fuzzy_matching_token_sort_ratio']])
-        doc['fuzzy_matching_token_set_ratio'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['fuzzy_matching_token_set_ratio']])
-        doc['word_match_share'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['word_match_share']])
-        doc['f1_score'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['f1_score']])
-        doc['mean_cos_dist_2gram'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['mean_cos_dist_2gram']])
-        doc['mean_leve_dist_2gram'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['mean_leve_dist_2gram']])
-        doc['mean_cos_dist_3gram'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['mean_cos_dist_3gram']])
-        doc['mean_leve_dist_3gram'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['mean_leve_dist_3gram']])
-        doc['mean_cos_dist_4gram'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['mean_cos_dist_4gram']])
-        doc['mean_leve_dist_4gram'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['mean_leve_dist_4gram']])
-        doc['mean_cos_dist_5gram'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['mean_cos_dist_5gram']])
-        doc['mean_leve_dist_5gram'] = ','.join(['{:.8f}'.format(x) if x != 1 else '1' for x in doc['mean_leve_dist_5gram']])
+        doc['levenshtein_dist'] = ','.join([num_2_str(x) for x in doc['levenshtein_dist']])
+        doc['longest_match_size'] = ','.join([num_2_str(x) for x in doc['longest_match_size']])
+        doc['longest_match_ratio'] = ','.join([num_2_str(x) for x in doc['longest_match_ratio']])
+        doc['compression_dist'] = ','.join([num_2_str(x) for x in doc['compression_dist']])
+        doc['jaccard_coef'] = ','.join([num_2_str(x) for x in doc['jaccard_coef']])
+        doc['dice_dist'] = ','.join([num_2_str(x) for x in doc['dice_dist']])
+        doc['countbased_cos_distance'] = ','.join([num_2_str(x) for x in doc['countbased_cos_distance']])
+        doc['fuzzy_matching_ratio'] = ','.join([num_2_str(x) for x in doc['fuzzy_matching_ratio']])
+        doc['fuzzy_matching_partial_ratio'] = ','.join([num_2_str(x) for x in doc['fuzzy_matching_partial_ratio']])
+        doc['fuzzy_matching_token_sort_ratio'] = ','.join([num_2_str(x) for x in doc['fuzzy_matching_token_sort_ratio']])
+        doc['fuzzy_matching_token_set_ratio'] = ','.join([num_2_str(x) for x in doc['fuzzy_matching_token_set_ratio']])
+        doc['word_match_share'] = ','.join([num_2_str(x) for x in doc['word_match_share']])
+        doc['f1_score'] = ','.join([num_2_str(x) for x in doc['f1_score']])
+        doc['mean_cos_dist_2gram'] = ','.join([num_2_str(x) for x in doc['mean_cos_dist_2gram']])
+        doc['mean_leve_dist_2gram'] = ','.join([num_2_str(x) for x in doc['mean_leve_dist_2gram']])
+        doc['mean_cos_dist_3gram'] = ','.join([num_2_str(x) for x in doc['mean_cos_dist_3gram']])
+        doc['mean_leve_dist_3gram'] = ','.join([num_2_str(x) for x in doc['mean_leve_dist_3gram']])
+        doc['mean_cos_dist_4gram'] = ','.join([num_2_str(x) for x in doc['mean_cos_dist_4gram']])
+        doc['mean_leve_dist_4gram'] = ','.join([num_2_str(x) for x in doc['mean_leve_dist_4gram']])
+        doc['mean_cos_dist_5gram'] = ','.join([num_2_str(x) for x in doc['mean_cos_dist_5gram']])
+        doc['mean_leve_dist_5gram'] = ','.join([num_2_str(x) for x in doc['mean_leve_dist_5gram']])
 
 if __name__ == '__main__':
     for line in sys.stdin:
@@ -111,5 +116,5 @@ if __name__ == '__main__':
 
         sample = json.loads(line.strip())
         extract_match_features(sample)
-        clean(sample)
+        reduce_memory(sample)
         print(json.dumps(sample, ensure_ascii=False))
