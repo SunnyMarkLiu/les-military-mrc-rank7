@@ -144,16 +144,6 @@ def gen_mrc_dataset(sample):
     """
     生成全文本下的 MRC 数据集
     """
-    # 段落文本拼接成 content，以及对于的特征的合并
-    for doc_id, doc in enumerate(sample['documents']):
-        if 'content' in doc: continue
-        doc['content'] = ''.join(doc['paragraphs'])
-        del doc['paragraphs']
-
-    # 对训练集定位答案的 start end 下标
-    if 'answer' not in sample:
-        return
-
     # 根据 support paragraph 找到答案所在的 sub para
     support_para_in_docids = find_answer_in_docid(sample['supporting_paragraph'])
 

@@ -143,9 +143,11 @@ def clean_sample(sample):
                                             .replace('@content4@content', '@content4@@content') \
                                             .replace('@content5@content', '@content5@@content')
 
+    del sample['keyword']
+
     for document in sample['documents']:
         document['paragraphs'] = [clean_text(para) for para in document['paragraphs']]
-        document['title'] = clean_text(document['title'])
+        del document['title']
 
         # 去除空段落和重复段落
         new_paras = []
@@ -153,6 +155,9 @@ def clean_sample(sample):
             if para != '' and para not in new_paras:
                 new_paras.append(para)
         document['paragraphs'] = new_paras
+
+        document['content'] = ''.join(document['paragraphs'])
+        del document['paragraphs']
 
 if __name__ == '__main__':
     for line in sys.stdin:

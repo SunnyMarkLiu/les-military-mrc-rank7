@@ -36,7 +36,6 @@ def extract_match_features(sample):
                     
             doc['levenshtein_dist'].extend([DistanceUtil.levenshtein_1(sent, que_str)] * sent_len)
             doc['longest_match_size'].extend([DistanceUtil.longest_match_size(sent, que_str)] * sent_len)
-            doc['longest_match_size'].extend([DistanceUtil.longest_match_size(sent, que_str)] * sent_len)
             doc['longest_match_ratio'].extend([DistanceUtil.longest_match_ratio(sent, que_str)] * sent_len)
             doc['compression_dist'].extend([DistanceUtil.compression_dist(sent, que_str)] * sent_len)
             doc['jaccard_coef'].extend([DistanceUtil.jaccard_coef(sent, que_str)] * sent_len)
@@ -72,20 +71,14 @@ def reduce_memory(sample):
     """
     去除不用的字段
     """
-    del sample['keyword']
-
     sample['ques_char_pos'] = ','.join(sample['ques_char_pos'])
     sample['ques_char_kw'] = ','.join(['{}'.format(x) for x in sample['ques_char_kw']])
     sample['ques_char_in_que'] = ','.join(['{}'.format(x) for x in sample['ques_char_in_que']])
-    sample['ques_char_entity'] = ','.join(sample['ques_char_entity'])
 
     for doc in sample['documents']:
-        del doc['title']
-
         doc['char_pos'] = ','.join(doc['char_pos'])
         doc['char_kw'] = ','.join(['{}'.format(x) for x in doc['char_kw']])
         doc['char_in_que'] = ','.join(['{}'.format(x) for x in doc['char_in_que']])
-        doc['char_entity'] = ','.join(doc['char_entity'])
 
         doc['levenshtein_dist'] = ','.join([num_2_str(x) for x in doc['levenshtein_dist']])
         doc['longest_match_size'] = ','.join([num_2_str(x) for x in doc['longest_match_size']])
