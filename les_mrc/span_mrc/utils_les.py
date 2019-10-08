@@ -324,17 +324,23 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                 char_entity = doc['char_entity']
 
                 # 将pos和ner做映射
-                for item_ in ques_char_pos:
-                    item_[0] = POS2ID[item_[0]] if item_[0] in POS2ID else POS2ID['other']
-                for item_ in ques_char_entity:
-                    item_[0] = NER2ID[item_[0]]
+                # for item_ in ques_char_pos:
+                #     item_[0] = POS2ID[item_[0]] if item_[0] in POS2ID else POS2ID['other']
+                # for item_ in ques_char_entity:
+                #     item_[0] = NER2ID[item_[0]]
+                ques_char_pos = [POS2ID[item_] if item_ in POS2ID else POS2ID['other']
+                                 for item_ in ques_char_pos]
+                ques_char_entity = [NER2ID[item_] for item_ in ques_char_entity.split(',')]
+                print(char_pos)
+                print(doc_id)
                 for item_ in char_pos:
                     item_[0] = POS2ID[item_[0]] if item_[0] in POS2ID else POS2ID['other']
                 for item_ in char_entity:
                     item_[0] = NER2ID[item_[0]]
 
                 # 将longest_match_size做归一化
-                longest_match_size = longest_match_size / len(question_text)
+                for item_ in longest_match_size:
+                    item_[0] = item_[0] / len(question_text)
 
                 # assert ques_char_pos == len(question_text)
                 # assert ques_char_kw == len(question_text)
