@@ -128,6 +128,7 @@ if __name__ == '__main__':
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
     for line in sys.stdin:
+        line = line.strip()
         if not line.startswith('{'):
             continue
 

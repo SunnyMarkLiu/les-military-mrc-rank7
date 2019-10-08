@@ -197,6 +197,7 @@ if __name__ == '__main__':
         if not line.startswith('{'):
             continue
 
+        line = line.replace('NaN', '0')
         json_sample = json.loads(line.strip())
 
         gen_bridging_entity_mrc_dataset(json_sample)
