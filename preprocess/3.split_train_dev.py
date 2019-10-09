@@ -8,10 +8,17 @@
 @github: https://github.com/sunnymarkLiu
 @time  : 2019/10/6 21:11
 """
+import os
 import sys
 import json
 
-with open('2475_dev_sample_ques_ids.txt', 'r') as f:
+dev_ques_ids_file = ''
+
+for f in os.listdir('./'):
+    if '_dev_sample_ques_ids.txt' in f:
+        dev_ques_ids_file = f
+
+with open(dev_ques_ids_file, 'r') as f:
     dev_ques_ids = f.readline().strip().split(',')
 
 dev_ques_ids = set(dev_ques_ids)
