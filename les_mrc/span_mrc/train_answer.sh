@@ -35,4 +35,4 @@ python run_les.py \
     --doc_stride 128 \
     --logging_steps 200 \
     --save_steps 8000 \
-    --eval_steps 8000 \
+    --eval_steps 4000 \
