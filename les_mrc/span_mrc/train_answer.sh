@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/Research/Reading-Comprehension/les-military-mrc/input/answer_mrc_dataset"
-MODEL_DIR="/home/lq/Research/Reading-Comprehension/pretrained_weights/chinese_wwm_pytorch"
+DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/answer_mrc_dataset"
+MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
 MODEL_COMMENT="answer_mrc_wwm_BertForLes"
 
 python run_les.py \
@@ -9,7 +9,7 @@ python run_les.py \
     --task_name answer_mrc \
     --comment ${MODEL_COMMENT} \
     --model_type bert \
-    --customer_model_class BertForLes \
+    --customer_model_class BertForLesWithFeatures \
     --model_name_or_path ${MODEL_DIR}/pytorch_model.bin \
     --config_name ${MODEL_DIR}/bert_config.json \
     --tokenizer_name ${MODEL_DIR}/vocab.txt \
@@ -17,8 +17,8 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file ${DATA_DIR}/train_max_content_len_1024.json \
-    --predict_file ${DATA_DIR}/dev.json \
+    --train_file ${DATA_DIR}/head50.json \
+    --predict_file ${DATA_DIR}/dev50.json \
     --output_dir answer_models/${MODEL_COMMENT} \
     --version_2_with_negative \
     --max_seq_length 512 \
