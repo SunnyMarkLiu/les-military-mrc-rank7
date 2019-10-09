@@ -142,6 +142,11 @@ def sample_train_content(sample, max_train_content_len, min_left_context_len=50,
         min_left_context_len: 答案左侧 context 的最小长度
         min_right_context_len：答案右侧 context 的最小长度
     """
+    sample['ques_char_pos'] = dense_feature_list(sample['ques_char_pos'])
+    sample['ques_char_kw'] = dense_feature_list(sample['ques_char_kw'])
+    sample['ques_char_in_que'] = dense_feature_list(sample['ques_char_in_que'])
+    sample['ques_char_entity'] = dense_feature_list(sample['ques_char_entity'].split(','))
+
     answer_in_docs = {}
 
     # 注意一个 doc 中可能存在多个答案
@@ -153,6 +158,8 @@ def sample_train_content(sample, max_train_content_len, min_left_context_len=50,
 
     for doc_id, doc in enumerate(sample['documents']):
         if len(doc['content']) < max_train_content_len:
+            # 特征更新
+            split_features(doc, 0, len(doc['content']))
             continue
 
         # 不包含答案的直接截断
@@ -241,6 +248,9 @@ def sample_train_content(sample, max_train_content_len, min_left_context_len=50,
                                 answer_labels.append(al)
                         answer_labels.extend(cur_doc_answers)
                         sample['answer_labels'] = answer_labels
+                    else:
+                        # 特征更新
+                        split_features(doc, 0, len(doc['content']))
                     # TODO:min start 和 max end 跨度太长，暂时直接丢弃随机丢弃中间的文本
                     # else:
                     #     gap = max_end - min_start + 1
