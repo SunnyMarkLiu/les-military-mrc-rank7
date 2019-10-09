@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 
 import argparse
+import gc
 import logging
 import os
 import random
@@ -44,6 +45,7 @@ from pytorch_transformers import AdamW, WarmupLinearSchedule
 from utils_les import (read_squad_examples, convert_examples_to_features,
                          RawResult, write_predictions,
                          RawResultExtended, write_predictions_extended)
+import compress_pickle
 
 # The follwing import is the official SQuAD evaluation script (2.0).
 # You can remove it from the dependencies if you are using this script outside of the library
@@ -81,7 +83,7 @@ def train(args, train_dataset, model, tokenizer):
 
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 else DistributedSampler(train_dataset)
-    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
+    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size, num_workers=4)
 
     if args.max_steps > 0:
         t_total = args.max_steps
@@ -140,43 +142,42 @@ def train(args, train_dataset, model, tokenizer):
         for step, batch in enumerate(epoch_iterator):
             model.train()
             batch = tuple(t.to(args.device) for t in batch)
-            inputs = {'input_ids':       batch[0],
-                      'attention_mask':  batch[1],
-                      'token_type_ids':  None if args.model_type == 'xlm' else batch[2],
-                      'start_positions': batch[3],
-                      'end_positions':   batch[4]}
-            if args.model_type in ['xlnet', 'xlm']:
-                inputs.update({'cls_index': batch[5],
-                               'p_mask':       batch[6]})
 
-            # TODO 这里增加一些特征, 注意batch[index]正确对应
-            inputs.update({'input_span_mask': batch[7],
-                           'doc_position': batch[8],
-                           'char_pos': batch[9],
-                           'char_kw': batch[10],
-                           'char_in_que': batch[11],
-                           'levenshtein_dist': batch[12],
-                           'longest_match_size': batch[13],
-                           'longest_match_ratio': batch[14],
-                           'compression_dist': batch[15],
-                           'jaccard_coef': batch[16],
-                           'dice_dist': batch[17],
-                           'countbased_cos_distance': batch[18],
-                           'fuzzy_matching_ratio': batch[19],
-                           'fuzzy_matching_partial_ratio': batch[20],
-                           'fuzzy_matching_token_sort_ratio': batch[21],
-                           'fuzzy_matching_token_set_ratio': batch[22],
-                           'word_match_share': batch[23],
-                           'f1_score': batch[24],
-                           'mean_cos_dist_2gram': batch[25],
-                           'mean_leve_dist_2gram': batch[26],
-                           'mean_cos_dist_3gram': batch[27],
-                           'mean_leve_dist_3gram': batch[28],
-                           'mean_cos_dist_4gram': batch[29],
-                           'mean_leve_dist_4gram': batch[30],
-                           'mean_cos_dist_5gram': batch[31],
-                           'mean_leve_dist_5gram': batch[32],
-                           'char_entity': batch[33]})
+            inputs = {
+                'input_ids': batch[0],
+                'attention_mask': batch[1],  # attention_mask == input_mask
+                'token_type_ids': batch[2],  # token_type_ids == segment_ids
+                'p_mask': batch[3],
+                'doc_position': batch[4],
+                'char_pos': batch[5],
+                'char_kw': batch[6],
+                'char_in_que': batch[7],
+                'levenshtein_dist': batch[8],
+                'longest_match_size': batch[9],
+                'longest_match_ratio': batch[10],
+                'compression_dist': batch[11],
+                'jaccard_coef': batch[12],
+                'dice_dist': batch[13],
+                'countbased_cos_distance': batch[14],
+                'fuzzy_matching_ratio': batch[15],
+                'fuzzy_matching_partial_ratio': batch[16],
+                'fuzzy_matching_token_sort_ratio': batch[17],
+                'fuzzy_matching_token_set_ratio': batch[18],
+                'word_match_share': batch[19],
+                'f1_score': batch[20],
+                'mean_cos_dist_2gram': batch[21],
+                'mean_leve_dist_2gram': batch[22],
+                'mean_cos_dist_3gram': batch[23],
+                'mean_leve_dist_3gram': batch[24],
+                'mean_cos_dist_4gram': batch[25],
+                'mean_leve_dist_4gram': batch[26],
+                'mean_cos_dist_5gram': batch[27],
+                'mean_leve_dist_5gram': batch[28],
+                'char_entity': batch[29],
+
+                'start_positions': batch[30],
+                'end_positions': batch[31]
+            }
 
             outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in pytorch-transformers (see doc)
@@ -272,49 +273,45 @@ def evaluate(args, model, tokenizer, prefix="les"):
         model.eval()
         batch = tuple(t.to(args.device) for t in batch)
         with torch.no_grad():
-            inputs = {'input_ids':      batch[0],
-                      'attention_mask': batch[1],
-                      'token_type_ids': None if args.model_type == 'xlm' else batch[2]  # XLM don't use segment_ids
-                      }
-            example_indices = batch[3]
-            if args.model_type in ['xlnet', 'xlm']:
-                inputs.update({'cls_index': batch[4],
-                               'p_mask':    batch[5]})
+            inputs = {
+                'input_ids': batch[0],
+                'attention_mask': batch[1],  # attention_mask == input_mask
+                'token_type_ids': batch[2],  # token_type_ids == segment_ids
+                'p_mask': batch[3],
+                'doc_position': batch[4],
+                'char_pos': batch[5],
+                'char_kw': batch[6],
+                'char_in_que': batch[7],
+                'levenshtein_dist': batch[8],
+                'longest_match_size': batch[9],
+                'longest_match_ratio': batch[10],
+                'compression_dist': batch[11],
+                'jaccard_coef': batch[12],
+                'dice_dist': batch[13],
+                'countbased_cos_distance': batch[14],
+                'fuzzy_matching_ratio': batch[15],
+                'fuzzy_matching_partial_ratio': batch[16],
+                'fuzzy_matching_token_sort_ratio': batch[17],
+                'fuzzy_matching_token_set_ratio': batch[18],
+                'word_match_share': batch[19],
+                'f1_score': batch[20],
+                'mean_cos_dist_2gram': batch[21],
+                'mean_leve_dist_2gram': batch[22],
+                'mean_cos_dist_3gram': batch[23],
+                'mean_leve_dist_3gram': batch[24],
+                'mean_cos_dist_4gram': batch[25],
+                'mean_leve_dist_4gram': batch[26],
+                'mean_cos_dist_5gram': batch[27],
+                'mean_leve_dist_5gram': batch[28],
+                'char_entity': batch[29]
+            }
 
-            # TODO 这里增加一些特征, 注意batch[index]正确对应
-            inputs.update({'input_span_mask': batch[6],
-                           'doc_position': batch[7],
-                           'char_pos': batch[8],
-                           'char_kw': batch[9],
-                           'char_in_que': batch[10],
-                           'levenshtein_dist': batch[11],
-                           'longest_match_size': batch[12],
-                           'longest_match_ratio': batch[13],
-                           'compression_dist': batch[14],
-                           'jaccard_coef': batch[15],
-                           'dice_dist': batch[16],
-                           'countbased_cos_distance': batch[17],
-                           'fuzzy_matching_ratio': batch[18],
-                           'fuzzy_matching_partial_ratio': batch[19],
-                           'fuzzy_matching_token_sort_ratio': batch[20],
-                           'fuzzy_matching_token_set_ratio': batch[21],
-                           'word_match_share': batch[22],
-                           'f1_score': batch[23],
-                           'mean_cos_dist_2gram': batch[24],
-                           'mean_leve_dist_2gram': batch[25],
-                           'mean_cos_dist_3gram': batch[26],
-                           'mean_leve_dist_3gram': batch[27],
-                           'mean_cos_dist_4gram': batch[28],
-                           'mean_leve_dist_4gram': batch[29],
-                           'mean_cos_dist_5gram': batch[30],
-                           'mean_leve_dist_5gram': batch[31],
-                           'char_entity': batch[32]})
-
+            example_indices = batch[30]
             outputs = model(**inputs)
 
         for i, example_index in enumerate(example_indices):
             eval_feature = features[example_index.item()]
-            unique_id = int(eval_feature.unique_id)
+            unique_id = int(eval_feature['unique_id'])
             if args.model_type in ['xlnet', 'xlm']:
                 # XLNet uses a more complex post-processing procedure
                 result = RawResultExtended(unique_id            = unique_id,
@@ -380,8 +377,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
 
     if data_type == 'train':
         cached_features_file = os.path.join(os.path.dirname(input_file),
-                                            'cached_{}_{}_seqlen{}_querylen{}_answerlen{}_docstride{}_train_neg_sample_ratio{}_back_trans_{}'.format(
-                                            args.task_name,
+                                            'cached_{}_seqlen{}_querylen{}_answerlen{}_docstride{}_train_neg_sample_ratio{}_back_trans_{}.pkl'.format(
                                             data_type,
                                             args.max_seq_length,
                                             args.max_query_length,
@@ -391,8 +387,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
                                             args.with_back_trans))
     else:
         cached_features_file = os.path.join(os.path.dirname(input_file),
-                                            'cached_{}_{}_seqlen{}_querylen{}_answerlen{}_docstride{}'.format(
-                                            args.task_name,
+                                            'cached_{}_seqlen{}_querylen{}_answerlen{}_docstride{}.pkl'.format(
                                             data_type,
                                             args.max_seq_length,
                                             args.max_query_length,
@@ -404,14 +399,8 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
     logger.info('cached file: {}'.format(cached_features_file))
     if os.path.exists(cached_features_file) and not args.overwrite_cache:
         logger.info("Loading features from cached file %s", cached_features_file)
-        features = torch.load(cached_features_file)
-
-    if output_examples:
-        logger.info("Reading examples from dataset file at %s", input_file)
-        examples = read_squad_examples(task_name=args.task_name,
-                                       input_file=input_file,
-                                       is_training=not evaluate,
-                                       version_2_with_negative=args.version_2_with_negative)
+        # features = torch.load(cached_features_file)
+        features = compress_pickle.load(cached_features_file)
 
     if not features:
         logger.info("Creating features")
@@ -428,115 +417,123 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
                                                 doc_stride=args.doc_stride,
                                                 max_query_length=args.max_query_length,
                                                 is_training=not evaluate)
+
+        del examples    # 节省内存，防止保存cache的时候出错
+        gc.collect()
         if args.local_rank in [-1, 0]:
             logger.info("Saving features into cached file %s", cached_features_file)
-            torch.save(features, cached_features_file)
+            # torch.save(features, cached_features_file)
+            compress_pickle.dump(features, cached_features_file)
 
     if args.local_rank == 0 and not evaluate:
         torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
 
     # Convert to Tensors and build dataset
     # TODO 这里会加一些特征
-    all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-    all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-    all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-    all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-    all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+    input_ids = torch.tensor([f['input_ids'] for f in features], dtype=torch.long)
+    input_mask = torch.tensor([f['input_mask'] for f in features], dtype=torch.long)
+    segment_ids = torch.tensor([f['segment_ids'] for f in features], dtype=torch.long)
+    p_mask = torch.tensor([f['p_mask'] for f in features], dtype=torch.float)
 
-    all_input_span_mask = torch.tensor([f.input_span_mask for f in features], dtype=torch.long)
-    all_doc_position = torch.tensor([f.doc_position for f in features], dtype=torch.long)
+    doc_position = torch.tensor([f['doc_position'] for f in features], dtype=torch.long)
 
     # 目前有25个特征
-    all_char_pos = torch.tensor([f.char_pos for f in features], dtype=torch.long)
-    all_char_kw = torch.tensor([f.char_kw for f in features], dtype=torch.long)
-    all_char_in_que = torch.tensor([f.char_in_que for f in features], dtype=torch.long)
-    all_levenshtein_dist = torch.tensor([f.levenshtein_dist for f in features], dtype=torch.float)
-    all_longest_match_size = torch.tensor([f.longest_match_size for f in features], dtype=torch.float)
-    all_longest_match_ratio = torch.tensor([f.longest_match_ratio for f in features], dtype=torch.float)
-    all_compression_dist = torch.tensor([f.compression_dist for f in features], dtype=torch.float)
-    all_jaccard_coef = torch.tensor([f.jaccard_coef for f in features], dtype=torch.float)
-    all_dice_dist = torch.tensor([f.dice_dist for f in features], dtype=torch.float)
-    all_countbased_cos_distance = torch.tensor([f.countbased_cos_distance for f in features], dtype=torch.float)
-    all_fuzzy_matching_ratio = torch.tensor([f.fuzzy_matching_ratio for f in features], dtype=torch.float)
-    all_fuzzy_matching_partial_ratio = torch.tensor([f.fuzzy_matching_partial_ratio for f in features], dtype=torch.float)
-    all_fuzzy_matching_token_sort_ratio = torch.tensor([f.fuzzy_matching_token_sort_ratio for f in features], dtype=torch.float)
-    all_fuzzy_matching_token_set_ratio = torch.tensor([f.fuzzy_matching_token_set_ratio for f in features], dtype=torch.float)
-    all_word_match_share = torch.tensor([f.word_match_share for f in features], dtype=torch.float)
-    all_f1_score = torch.tensor([f.f1_score for f in features], dtype=torch.float)
-    all_mean_cos_dist_2gram = torch.tensor([f.mean_cos_dist_2gram for f in features], dtype=torch.float)
-    all_mean_leve_dist_2gram = torch.tensor([f.mean_leve_dist_2gram for f in features], dtype=torch.float)
-    all_mean_cos_dist_3gram = torch.tensor([f.mean_cos_dist_3gram for f in features], dtype=torch.float)
-    all_mean_leve_dist_3gram = torch.tensor([f.mean_leve_dist_3gram for f in features], dtype=torch.float)
-    all_mean_cos_dist_4gram = torch.tensor([f.mean_cos_dist_4gram for f in features], dtype=torch.float)
-    all_mean_leve_dist_4gram = torch.tensor([f.mean_leve_dist_4gram for f in features], dtype=torch.float)
-    all_mean_cos_dist_5gram = torch.tensor([f.mean_cos_dist_5gram for f in features], dtype=torch.float)
-    all_mean_leve_dist_5gram = torch.tensor([f.mean_leve_dist_5gram for f in features], dtype=torch.float)
-    all_char_entity = torch.tensor([f.char_entity for f in features], dtype=torch.long)
+    char_pos = torch.tensor([f['char_pos'] for f in features], dtype=torch.long)
+    char_kw = torch.tensor([f['char_kw'] for f in features], dtype=torch.long)
+    char_in_que = torch.tensor([f['char_in_que'] for f in features], dtype=torch.long)
+    levenshtein_dist = torch.tensor([f['levenshtein_dist'] for f in features], dtype=torch.float)
+    longest_match_size = torch.tensor([f['longest_match_size'] for f in features], dtype=torch.float)
+    longest_match_ratio = torch.tensor([f['longest_match_ratio'] for f in features], dtype=torch.float)
+    compression_dist = torch.tensor([f['compression_dist'] for f in features], dtype=torch.float)
+    jaccard_coef = torch.tensor([f['jaccard_coef'] for f in features], dtype=torch.float)
+    dice_dist = torch.tensor([f['dice_dist'] for f in features], dtype=torch.float)
+    countbased_cos_distance = torch.tensor([f['countbased_cos_distance'] for f in features], dtype=torch.float)
+    fuzzy_matching_ratio = torch.tensor([f['fuzzy_matching_ratio'] for f in features], dtype=torch.float)
+    fuzzy_matching_partial_ratio = torch.tensor([f['fuzzy_matching_partial_ratio'] for f in features], dtype=torch.float)
+    fuzzy_matching_token_sort_ratio = torch.tensor([f['fuzzy_matching_token_sort_ratio'] for f in features], dtype=torch.float)
+    fuzzy_matching_token_set_ratio = torch.tensor([f['fuzzy_matching_token_set_ratio'] for f in features], dtype=torch.float)
+    word_match_share = torch.tensor([f['word_match_share'] for f in features], dtype=torch.float)
+    f1_score = torch.tensor([f['f1_score'] for f in features], dtype=torch.float)
+    mean_cos_dist_2gram = torch.tensor([f['mean_cos_dist_2gram'] for f in features], dtype=torch.float)
+    mean_leve_dist_2gram = torch.tensor([f['mean_leve_dist_2gram'] for f in features], dtype=torch.float)
+    mean_cos_dist_3gram = torch.tensor([f['mean_cos_dist_3gram'] for f in features], dtype=torch.float)
+    mean_leve_dist_3gram = torch.tensor([f['mean_leve_dist_3gram'] for f in features], dtype=torch.float)
+    mean_cos_dist_4gram = torch.tensor([f['mean_cos_dist_4gram'] for f in features], dtype=torch.float)
+    mean_leve_dist_4gram = torch.tensor([f['mean_leve_dist_4gram'] for f in features], dtype=torch.float)
+    mean_cos_dist_5gram = torch.tensor([f['mean_cos_dist_5gram'] for f in features], dtype=torch.float)
+    mean_leve_dist_5gram = torch.tensor([f['mean_leve_dist_5gram'] for f in features], dtype=torch.float)
+    char_entity = torch.tensor([f['char_entity'] for f in features], dtype=torch.long)
 
     if evaluate:
-        all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
-        dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
-                                all_example_index, all_cls_index, all_p_mask,
-                                all_input_span_mask, all_doc_position,
-                                all_char_pos,
-                                all_char_kw,
-                                all_char_in_que,
-                                all_levenshtein_dist,
-                                all_longest_match_size,
-                                all_longest_match_ratio,
-                                all_compression_dist,
-                                all_jaccard_coef,
-                                all_dice_dist,
-                                all_countbased_cos_distance,
-                                all_fuzzy_matching_ratio,
-                                all_fuzzy_matching_partial_ratio,
-                                all_fuzzy_matching_token_sort_ratio,
-                                all_fuzzy_matching_token_set_ratio,
-                                all_word_match_share,
-                                all_f1_score,
-                                all_mean_cos_dist_2gram,
-                                all_mean_leve_dist_2gram,
-                                all_mean_cos_dist_3gram,
-                                all_mean_leve_dist_3gram,
-                                all_mean_cos_dist_4gram,
-                                all_mean_leve_dist_4gram,
-                                all_mean_cos_dist_5gram,
-                                all_mean_leve_dist_5gram,
-                                all_char_entity)
+        example_index = torch.arange(input_ids.size(0), dtype=torch.long)
+        dataset = TensorDataset(input_ids, input_mask, segment_ids,
+                                p_mask,
+                                doc_position,
+                                char_pos,
+                                char_kw,
+                                char_in_que,
+                                levenshtein_dist,
+                                longest_match_size,
+                                longest_match_ratio,
+                                compression_dist,
+                                jaccard_coef,
+                                dice_dist,
+                                countbased_cos_distance,
+                                fuzzy_matching_ratio,
+                                fuzzy_matching_partial_ratio,
+                                fuzzy_matching_token_sort_ratio,
+                                fuzzy_matching_token_set_ratio,
+                                word_match_share,
+                                f1_score,
+                                mean_cos_dist_2gram,
+                                mean_leve_dist_2gram,
+                                mean_cos_dist_3gram,
+                                mean_leve_dist_3gram,
+                                mean_cos_dist_4gram,
+                                mean_leve_dist_4gram,
+                                mean_cos_dist_5gram,
+                                mean_leve_dist_5gram,
+                                char_entity,
+                                example_index)
     else:
-        all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
-        all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
-        dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
-                                all_start_positions, all_end_positions,
-                                all_cls_index, all_p_mask,
-                                all_input_span_mask, all_doc_position,
-                                all_char_pos,
-                                all_char_kw,
-                                all_char_in_que,
-                                all_levenshtein_dist,
-                                all_longest_match_size,
-                                all_longest_match_ratio,
-                                all_compression_dist,
-                                all_jaccard_coef,
-                                all_dice_dist,
-                                all_countbased_cos_distance,
-                                all_fuzzy_matching_ratio,
-                                all_fuzzy_matching_partial_ratio,
-                                all_fuzzy_matching_token_sort_ratio,
-                                all_fuzzy_matching_token_set_ratio,
-                                all_word_match_share,
-                                all_f1_score,
-                                all_mean_cos_dist_2gram,
-                                all_mean_leve_dist_2gram,
-                                all_mean_cos_dist_3gram,
-                                all_mean_leve_dist_3gram,
-                                all_mean_cos_dist_4gram,
-                                all_mean_leve_dist_4gram,
-                                all_mean_cos_dist_5gram,
-                                all_mean_leve_dist_5gram,
-                                all_char_entity)
+        start_positions = torch.tensor([f['start_position'] for f in features], dtype=torch.long)
+        end_positions = torch.tensor([f['end_position'] for f in features], dtype=torch.long)
+        dataset = TensorDataset(input_ids, input_mask, segment_ids,
+                                p_mask,
+                                doc_position,
+                                char_pos,
+                                char_kw,
+                                char_in_que,
+                                levenshtein_dist,
+                                longest_match_size,
+                                longest_match_ratio,
+                                compression_dist,
+                                jaccard_coef,
+                                dice_dist,
+                                countbased_cos_distance,
+                                fuzzy_matching_ratio,
+                                fuzzy_matching_partial_ratio,
+                                fuzzy_matching_token_sort_ratio,
+                                fuzzy_matching_token_set_ratio,
+                                word_match_share,
+                                f1_score,
+                                mean_cos_dist_2gram,
+                                mean_leve_dist_2gram,
+                                mean_cos_dist_3gram,
+                                mean_leve_dist_3gram,
+                                mean_cos_dist_4gram,
+                                mean_leve_dist_4gram,
+                                mean_cos_dist_5gram,
+                                mean_leve_dist_5gram,
+                                char_entity,
+                                start_positions, end_positions)
 
     if output_examples:
+        logger.info("Reading examples from dataset file at %s", input_file)
+        examples = read_squad_examples(task_name=args.task_name,
+                                       input_file=input_file,
+                                       is_training=not evaluate,
+                                       version_2_with_negative=args.version_2_with_negative)
         return dataset, examples, features
     return dataset
 
@@ -684,12 +681,12 @@ def main():
         if args.predict_file is None or not os.path.exists(args.predict_file):
             raise FileNotFoundError('when evaluating or predicting, you must have correct predict_file path')
 
-    # 检查task_name和文件路径是否一致, 防止任务与数据不匹配
-    for file_path in [args.train_file, args.predict_file]:
-        if file_path is None:
-            continue
-        if args.task_name not in os.path.dirname(file_path).split('/')[-1]:
-            raise ValueError('Inconsistency between data_type and files')
+    # # 检查task_name和文件路径是否一致, 防止任务与数据不匹配
+    # for file_path in [args.train_file, args.predict_file]:
+    #     if file_path is None:
+    #         continue
+    #     if args.task_name not in os.path.dirname(file_path).split('/')[-1]:
+    #         raise ValueError('Inconsistency between data_type and files')
 
     # 设置cuda devices
     logger.warning('we set CUDA_VISIBLE_DEVICES: {}'.format(args.cuda_devices))

@@ -23,6 +23,7 @@ import logging
 import math
 import collections
 from io import open
+import compress_pickle
 
 from pytorch_transformers.tokenization_bert import BasicTokenizer
 
@@ -146,98 +147,6 @@ class SquadExample(object):
         return s
 
 
-class InputFeatures(object):
-    """A single set of features of data."""
-
-    def __init__(self,
-                 unique_id,
-                 example_index,
-                 doc_span_index,
-                 tokens,
-                 token_to_orig_map,
-                 token_is_max_context,
-                 input_ids,
-                 input_mask,
-                 segment_ids,
-                 input_span_mask,
-                 cls_index,
-                 p_mask,
-                 paragraph_len,
-                 start_position=None,
-                 end_position=None,
-                 is_impossible=None,
-                 doc_position=None,
-                 char_pos=None,
-                 char_kw=None,
-                 char_in_que=None,
-                 levenshtein_dist=None,
-                 longest_match_size=None,
-                 longest_match_ratio=None,
-                 compression_dist=None,
-                 jaccard_coef=None,
-                 dice_dist=None,
-                 countbased_cos_distance=None,
-                 fuzzy_matching_ratio=None,
-                 fuzzy_matching_partial_ratio=None,
-                 fuzzy_matching_token_sort_ratio=None,
-                 fuzzy_matching_token_set_ratio=None,
-                 word_match_share=None,
-                 f1_score=None,
-                 mean_cos_dist_2gram=None,
-                 mean_leve_dist_2gram=None,
-                 mean_cos_dist_3gram=None,
-                 mean_leve_dist_3gram=None,
-                 mean_cos_dist_4gram=None,
-                 mean_leve_dist_4gram=None,
-                 mean_cos_dist_5gram=None,
-                 mean_leve_dist_5gram=None,
-                 char_entity=None):
-        self.unique_id = unique_id
-        self.example_index = example_index
-        self.doc_span_index = doc_span_index
-        self.tokens = tokens
-        self.token_to_orig_map = token_to_orig_map
-        self.token_is_max_context = token_is_max_context
-        self.input_ids = input_ids
-        self.input_mask = input_mask
-        self.segment_ids = segment_ids
-        self.input_span_mask = input_span_mask
-        self.cls_index = cls_index
-        self.p_mask = p_mask
-        self.paragraph_len = paragraph_len
-        self.start_position = start_position
-        self.end_position = end_position
-        self.is_impossible = is_impossible
-
-        # 额外特征
-        self.doc_position = doc_position
-        self.char_pos = char_pos
-        self.char_kw = char_kw
-        self.char_in_que = char_in_que
-        self.levenshtein_dist = levenshtein_dist
-        self.longest_match_size = longest_match_size
-        self.longest_match_ratio = longest_match_ratio
-        self.compression_dist = compression_dist
-        self.jaccard_coef = jaccard_coef
-        self.dice_dist = dice_dist
-        self.countbased_cos_distance = countbased_cos_distance
-        self.fuzzy_matching_ratio = fuzzy_matching_ratio
-        self.fuzzy_matching_partial_ratio = fuzzy_matching_partial_ratio
-        self.fuzzy_matching_token_sort_ratio = fuzzy_matching_token_sort_ratio
-        self.fuzzy_matching_token_set_ratio = fuzzy_matching_token_set_ratio
-        self.word_match_share = word_match_share
-        self.f1_score = f1_score
-        self.mean_cos_dist_2gram = mean_cos_dist_2gram
-        self.mean_leve_dist_2gram = mean_leve_dist_2gram
-        self.mean_cos_dist_3gram = mean_cos_dist_3gram
-        self.mean_leve_dist_3gram = mean_leve_dist_3gram
-        self.mean_cos_dist_4gram = mean_cos_dist_4gram
-        self.mean_leve_dist_4gram = mean_leve_dist_4gram
-        self.mean_cos_dist_5gram = mean_cos_dist_5gram
-        self.mean_leve_dist_5gram = mean_leve_dist_5gram
-        self.char_entity = char_entity
-
-
 def read_squad_examples(task_name, input_file, is_training, version_2_with_negative):
     """Read a SQuAD json file into a list of SquadExample."""
 
@@ -337,36 +246,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                 # 将longest_match_size做归一化
                 for item_ in longest_match_size:
                     item_[0] = item_[0] / len(question_text)
-
-                # assert ques_char_pos == len(question_text)
-                # assert ques_char_kw == len(question_text)
-                # assert ques_char_entity == len(question_text)
-                #
-                # assert char_pos == len(doc_tokens)
-                # assert char_kw == len(doc_tokens)
-                # assert char_in_que == len(doc_tokens)
-                # assert levenshtein_dist == len(doc_tokens)
-                # assert longest_match_size == len(doc_tokens)
-                # assert longest_match_ratio == len(doc_tokens)
-                # assert compression_dist == len(doc_tokens)
-                # assert jaccard_coef == len(doc_tokens)
-                # assert dice_dist == len(doc_tokens)
-                # assert countbased_cos_distance == len(doc_tokens)
-                # assert fuzzy_matching_ratio == len(doc_tokens)
-                # assert fuzzy_matching_partial_ratio == len(doc_tokens)
-                # assert fuzzy_matching_token_sort_ratio == len(doc_tokens)
-                # assert fuzzy_matching_token_set_ratio == len(doc_tokens)
-                # assert word_match_share == len(doc_tokens)
-                # assert f1_score == len(doc_tokens)
-                # assert mean_cos_dist_2gram == len(doc_tokens)
-                # assert mean_leve_dist_2gram == len(doc_tokens)
-                # assert mean_cos_dist_3gram == len(doc_tokens)
-                # assert mean_leve_dist_3gram == len(doc_tokens)
-                # assert mean_cos_dist_4gram == len(doc_tokens)
-                # assert mean_leve_dist_4gram == len(doc_tokens)
-                # assert mean_cos_dist_5gram == len(doc_tokens)
-                # assert mean_leve_dist_5gram == len(doc_tokens)
-                # assert char_entity == len(doc_tokens)
 
                 if is_training:
                     if doc_id in match_doc_ids:  # 该document有答案
@@ -514,6 +393,9 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                         mean_leve_dist_5gram=mean_leve_dist_5gram,
                         char_entity=char_entity)
                     examples.append(example)
+
+                # TODO：此处调用 convert_examples_to_features 的代码，实现合并，减少读取所有 examples 所占用的内存！！
+                # 同时转换的 features 多于一定数目如10000进行 compress_pickle 压缩处理，load cache 的时候训练读取pickle
     return examples
 
 
@@ -677,9 +559,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             token_is_max_context = {}
             segment_ids = []
 
-            # 借鉴CMRC2018
-            input_span_mask = []
-
             # 额外特征, 这里会将question和doc拼接
             char_pos = []
             char_kw = []
@@ -716,7 +595,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 tokens.append(cls_token)
                 segment_ids.append(cls_token_segment_id)
                 p_mask.append(0)
-                input_span_mask.append(1)
                 cls_index = 0
 
                 char_pos.append(POS2ID['blank'])
@@ -760,7 +638,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 tokens.append(token)
                 segment_ids.append(sequence_a_segment_id)
                 p_mask.append(1)
-                input_span_mask.append(0)
 
                 char_in_que.append(0)
                 levenshtein_dist.append(1.0)
@@ -789,7 +666,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             tokens.append(sep_token)
             segment_ids.append(sequence_a_segment_id)
             p_mask.append(1)
-            input_span_mask.append(0)
 
             char_pos.append(POS2ID['blank'])
             char_kw.append(0)
@@ -828,7 +704,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 tokens.append(all_doc_tokens[split_token_index])
                 segment_ids.append(sequence_b_segment_id)
                 p_mask.append(0)
-                input_span_mask.append(1)
 
                 char_pos.append(char_pos_flat[split_token_index])
                 char_kw.append(char_kw_flat[split_token_index])
@@ -861,7 +736,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             tokens.append(sep_token)
             segment_ids.append(sequence_b_segment_id)
             p_mask.append(1)
-            input_span_mask.append(0)
 
             char_pos.append(POS2ID['blank'])
             char_kw.append(0)
@@ -894,7 +768,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 tokens.append(cls_token)
                 segment_ids.append(cls_token_segment_id)
                 p_mask.append(0)
-                input_span_mask.append(1)
                 cls_index = len(tokens) - 1  # Index of classification token
 
             input_ids = tokenizer.convert_tokens_to_ids(tokens)
@@ -909,7 +782,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 input_mask.append(0 if mask_padding_with_zero else 1)
                 segment_ids.append(pad_token_segment_id)
                 p_mask.append(1)
-                input_span_mask.append(0)
 
                 char_pos.append(POS2ID['blank'])
                 char_kw.append(0)
@@ -940,7 +812,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             assert len(input_ids) == max_seq_length
             assert len(input_mask) == max_seq_length
             assert len(segment_ids) == max_seq_length
-            assert len(input_span_mask) == max_seq_length
 
             assert len(char_pos) == max_seq_length
             assert len(char_kw) == max_seq_length
@@ -1016,8 +887,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                     "input_mask: %s" % " ".join([str(x) for x in input_mask]))
                 logger.info(
                     "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-                logger.info(
-                    "input_span_mask: %s" % " ".join([str(x) for x in input_span_mask]))
                 if is_training and span_is_impossible:
                     logger.info("impossible example")
                 if is_training and not span_is_impossible:
@@ -1026,50 +895,47 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                     logger.info("end_position: %d" % (end_position))
                     logger.info("answer: %s" % (answer_text))
 
-            features.append(
-                InputFeatures(
-                    unique_id=unique_id,
-                    example_index=example_index,
-                    doc_span_index=doc_span_index,
-                    tokens=tokens,
-                    token_to_orig_map=token_to_orig_map,
-                    token_is_max_context=token_is_max_context,
-                    input_ids=input_ids,
-                    input_mask=input_mask,
-                    segment_ids=segment_ids,
-                    input_span_mask=input_span_mask,
-                    cls_index=cls_index,
-                    p_mask=p_mask,
-                    paragraph_len=paragraph_len,
-                    start_position=start_position,
-                    end_position=end_position,
-                    is_impossible=span_is_impossible,
-                    doc_position=example.doc_position,
-                    char_pos=char_pos,
-                    char_kw=char_kw,
-                    char_in_que=char_in_que,
-                    levenshtein_dist=levenshtein_dist,
-                    longest_match_size=longest_match_size,
-                    longest_match_ratio=longest_match_ratio,
-                    compression_dist=compression_dist,
-                    jaccard_coef=jaccard_coef,
-                    dice_dist=dice_dist,
-                    countbased_cos_distance=countbased_cos_distance,
-                    fuzzy_matching_ratio=fuzzy_matching_ratio,
-                    fuzzy_matching_partial_ratio=fuzzy_matching_partial_ratio,
-                    fuzzy_matching_token_sort_ratio=fuzzy_matching_token_sort_ratio,
-                    fuzzy_matching_token_set_ratio=fuzzy_matching_token_set_ratio,
-                    word_match_share=word_match_share,
-                    f1_score=f1_score,
-                    mean_cos_dist_2gram=mean_cos_dist_2gram,
-                    mean_leve_dist_2gram=mean_leve_dist_2gram,
-                    mean_cos_dist_3gram=mean_cos_dist_3gram,
-                    mean_leve_dist_3gram=mean_leve_dist_3gram,
-                    mean_cos_dist_4gram=mean_cos_dist_4gram,
-                    mean_leve_dist_4gram=mean_leve_dist_4gram,
-                    mean_cos_dist_5gram=mean_cos_dist_5gram,
-                    mean_leve_dist_5gram=mean_leve_dist_5gram,
-                    char_entity=char_entity))
+            features.append({
+                'unique_id': unique_id,
+                'example_index': example_index,
+                'doc_span_index': doc_span_index,
+                'tokens': tokens,
+                'token_to_orig_map': token_to_orig_map,
+                'token_is_max_context': token_is_max_context,
+                'input_ids': input_ids,
+                'input_mask': input_mask,
+                'segment_ids': segment_ids,
+                'p_mask': p_mask,
+                'paragraph_len': paragraph_len,
+                'start_position': start_position,
+                'end_position': end_position,
+                'is_impossible': span_is_impossible,
+                'doc_position': example.doc_position,
+                'char_pos': char_pos,
+                'char_kw': char_kw,
+                'char_in_que': char_in_que,
+                'levenshtein_dist': levenshtein_dist,
+                'longest_match_size': longest_match_size,
+                'longest_match_ratio': longest_match_ratio,
+                'compression_dist': compression_dist,
+                'jaccard_coef': jaccard_coef,
+                'dice_dist': dice_dist,
+                'countbased_cos_distance': countbased_cos_distance,
+                'fuzzy_matching_ratio': fuzzy_matching_ratio,
+                'fuzzy_matching_partial_ratio': fuzzy_matching_partial_ratio,
+                'fuzzy_matching_token_sort_ratio': fuzzy_matching_token_sort_ratio,
+                'fuzzy_matching_token_set_ratio': fuzzy_matching_token_set_ratio,
+                'word_match_share': word_match_share,
+                'f1_score': f1_score,
+                'mean_cos_dist_2gram': mean_cos_dist_2gram,
+                'mean_leve_dist_2gram': mean_leve_dist_2gram,
+                'mean_cos_dist_3gram': mean_cos_dist_3gram,
+                'mean_leve_dist_3gram': mean_leve_dist_3gram,
+                'mean_cos_dist_4gram': mean_cos_dist_4gram,
+                'mean_leve_dist_4gram': mean_leve_dist_4gram,
+                'mean_cos_dist_5gram': mean_cos_dist_5gram,
+                'mean_leve_dist_5gram': mean_leve_dist_5gram,
+                'char_entity': char_entity})
             unique_id += 1
 
     # 打印未识别或者被跳过的token
@@ -1175,7 +1041,7 @@ def write_predictions(task_name, all_examples, all_features, all_results, n_best
 
     example_index_to_features = collections.defaultdict(list)
     for feature in all_features:
-        example_index_to_features[feature.example_index].append(feature)
+        example_index_to_features[feature['example_index']].append(feature)
 
     unique_id_to_result = {}
     for result in all_results:
@@ -1199,7 +1065,7 @@ def write_predictions(task_name, all_examples, all_features, all_results, n_best
         null_start_logit = 0  # the start logit at the slice with min null score
         null_end_logit = 0  # the end logit at the slice with min null score
         for (feature_index, feature) in enumerate(features):
-            result = unique_id_to_result[feature.unique_id]
+            result = unique_id_to_result[feature['unique_id']]
             start_indexes = _get_best_indexes(result.start_logits, n_best_size)
             end_indexes = _get_best_indexes(result.end_logits, n_best_size)
             # if we could have irrelevant answers, get the min score of irrelevant
@@ -1215,15 +1081,15 @@ def write_predictions(task_name, all_examples, all_features, all_results, n_best
                     # We could hypothetically create invalid predictions, e.g., predict
                     # that the start of the span is in the question. We throw out all
                     # invalid predictions.
-                    if start_index >= len(feature.tokens):
+                    if start_index >= len(feature['tokens']):
                         continue
-                    if end_index >= len(feature.tokens):
+                    if end_index >= len(feature['tokens']):
                         continue
-                    if start_index not in feature.token_to_orig_map:
+                    if start_index not in feature['token_to_orig_map']:
                         continue
-                    if end_index not in feature.token_to_orig_map:
+                    if end_index not in feature['token_to_orig_map']:
                         continue
-                    if not feature.token_is_max_context.get(start_index, False):
+                    if not feature['token_is_max_context'].get(start_index, False):
                         continue
                     if end_index < start_index:
                         continue
@@ -1260,9 +1126,9 @@ def write_predictions(task_name, all_examples, all_features, all_results, n_best
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                # tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1)]
-                orig_doc_start = feature.token_to_orig_map[pred.start_index]
-                orig_doc_end = feature.token_to_orig_map[pred.end_index]
+                # tok_tokens = feature['tokens'][pred.start_index:(pred.end_index + 1)]
+                orig_doc_start = feature['token_to_orig_map'][pred.start_index]
+                orig_doc_end = feature['token_to_orig_map'][pred.end_index]
                 orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end + 1)]
                 # tok_text = " ".join(tok_tokens)
 

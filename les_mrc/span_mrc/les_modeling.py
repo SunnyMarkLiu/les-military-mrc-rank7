@@ -278,15 +278,16 @@ class BertForLesWithFeatures(BertPreTrainedModel):
         self.bert = BertModel(config)
 
         # 添加特征后的维度
-        self.hidden_size = config.hidden_size + 21 + POS_DIM + NER_DIM + 2 + 2
+        # self.hidden_size = config.hidden_size + 21 + POS_DIM + NER_DIM + 2 + 2
+        self.hidden_size = config.hidden_size + 20 + POS_DIM + NER_DIM + 2 + 2
 
         self.qa_outputs = nn.Linear(self.hidden_size, config.num_labels)
 
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, start_positions=None,
-                end_positions=None, position_ids=None, head_mask=None,
-                input_span_mask=None, doc_position=None,
+                end_positions=None, position_ids=None, head_mask=None, p_mask=None,
+                doc_position=None,
                 char_pos=None,
                 char_kw=None,
                 char_in_que=None,
@@ -324,19 +325,23 @@ class BertForLesWithFeatures(BertPreTrainedModel):
         char_kw = F.one_hot(char_kw, num_classes=2).float()
         char_in_que = F.one_hot(char_in_que, num_classes=2).float()
         # 拼接所有特征
-        features = torch.stack([levenshtein_dist,
+        features = torch.stack([
+                                # 0.6902675925742418 (以下6个需筛选)
+                                levenshtein_dist,
                                 longest_match_size,
                                 longest_match_ratio,
                                 compression_dist,
                                 jaccard_coef,
                                 dice_dist,
-                                countbased_cos_distance,
+                                # countbased_cos_distance,  # 会导致 loss NaN
+                                # 0.6990654143408181
                                 fuzzy_matching_ratio,
                                 fuzzy_matching_partial_ratio,
                                 fuzzy_matching_token_sort_ratio,
                                 fuzzy_matching_token_set_ratio,
                                 word_match_share,
                                 f1_score,
+                                # 0.6838707144274144
                                 mean_cos_dist_2gram,
                                 mean_leve_dist_2gram,
                                 mean_cos_dist_3gram,
@@ -345,7 +350,9 @@ class BertForLesWithFeatures(BertPreTrainedModel):
                                 mean_leve_dist_4gram,
                                 mean_cos_dist_5gram,
                                 mean_leve_dist_5gram], dim=2)
+        # 0.6777278562005111，pos，kw，ner，wiq
         features = torch.cat([char_pos, char_entity, char_kw, char_in_que, features], dim=-1)
+
         sequence_output = torch.cat([sequence_output, features], dim=-1)
 
         logits = self.qa_outputs(sequence_output)
@@ -354,7 +361,7 @@ class BertForLesWithFeatures(BertPreTrainedModel):
         end_logits = end_logits.squeeze(-1)
 
         # 增加input_span_mask, 这里为None时会报错(防止特征没有load)
-        adder = (1.0 - input_span_mask.float()) * VERY_NEGATIVE_NUMBER
+        adder = p_mask.float() * VERY_NEGATIVE_NUMBER
         start_logits += adder
         end_logits += adder
 
