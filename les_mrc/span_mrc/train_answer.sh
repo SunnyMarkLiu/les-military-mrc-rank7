@@ -17,15 +17,15 @@ python run_les.py \
     --do_eval \
     --evaluate_during_training \
     --do_lower_case \
-    --train_file ${DATA_DIR}/head50.json \
-    --predict_file ${DATA_DIR}/dev50.json \
+    --train_file ${DATA_DIR}/train_max_content_len_1024.json   \
+    --predict_file ${DATA_DIR}/dev_dense_feat.json \
     --output_dir answer_models/${MODEL_COMMENT} \
     --version_2_with_negative \
     --max_seq_length 512 \
     --max_query_length 64 \
     --max_answer_length 110 \
     --train_neg_sample_ratio 0.0 \
-    --per_gpu_train_batch_size 8 \
+    --per_gpu_train_batch_size 7 \
     --per_gpu_eval_batch_size 24 \
     --learning_rate 3e-5 \
     --warmup_steps 5200 \

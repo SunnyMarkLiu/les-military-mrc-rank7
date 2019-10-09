@@ -1,10 +1,13 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from pytorch_transformers import BertPreTrainedModel, BertModel
 from nn.layers import Highway
 from nn.recurrent import BiGRU
 from nn.bert_modules.transformer import TransformerBlock
+
+from utils_les import POS_DIM, NER_DIM
 
 VERY_NEGATIVE_NUMBER = -1e29
 
@@ -273,7 +276,11 @@ class BertForLesWithFeatures(BertPreTrainedModel):
         self.num_labels = config.num_labels
 
         self.bert = BertModel(config)
-        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+
+        # 添加特征后的维度
+        self.hidden_size = config.hidden_size + 21 + POS_DIM + NER_DIM + 2 + 2
+
+        self.qa_outputs = nn.Linear(self.hidden_size, config.num_labels)
 
         self.apply(self.init_weights)
 
@@ -308,6 +315,38 @@ class BertForLesWithFeatures(BertPreTrainedModel):
         outputs = self.bert(input_ids, position_ids=position_ids, token_type_ids=token_type_ids,
                             attention_mask=attention_mask, head_mask=head_mask)
         sequence_output = outputs[0]
+
+        ## 添加特征
+        # pos和ner进行one hot
+        char_pos = F.one_hot(char_pos, num_classes=POS_DIM).float()
+        char_entity = F.one_hot(char_entity, num_classes=NER_DIM).float()
+        # keyword/wiq进行ont hot
+        char_kw = F.one_hot(char_kw, num_classes=2).float()
+        char_in_que = F.one_hot(char_in_que, num_classes=2).float()
+        # 拼接所有特征
+        features = torch.stack([levenshtein_dist,
+                                longest_match_size,
+                                longest_match_ratio,
+                                compression_dist,
+                                jaccard_coef,
+                                dice_dist,
+                                countbased_cos_distance,
+                                fuzzy_matching_ratio,
+                                fuzzy_matching_partial_ratio,
+                                fuzzy_matching_token_sort_ratio,
+                                fuzzy_matching_token_set_ratio,
+                                word_match_share,
+                                f1_score,
+                                mean_cos_dist_2gram,
+                                mean_leve_dist_2gram,
+                                mean_cos_dist_3gram,
+                                mean_leve_dist_3gram,
+                                mean_cos_dist_4gram,
+                                mean_leve_dist_4gram,
+                                mean_cos_dist_5gram,
+                                mean_leve_dist_5gram], dim=2)
+        features = torch.cat([char_pos, char_entity, char_kw, char_in_que, features], dim=-1)
+        sequence_output = torch.cat([sequence_output, features], dim=-1)
 
         logits = self.qa_outputs(sequence_output)
         start_logits, end_logits = logits.split(1, dim=-1)

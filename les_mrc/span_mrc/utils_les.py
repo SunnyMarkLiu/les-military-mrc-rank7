@@ -263,6 +263,15 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
             context_num = len(sample['documents'])  # 莱斯杯固定都是5个
             context_list = [doc['content'] for doc in sample['documents']]
 
+            # 处理question特征
+            ques_char_pos = sample['ques_char_pos']
+            ques_char_kw = sample['ques_char_kw']
+            ques_char_entity = sample['ques_char_entity']
+            for item_ in ques_char_pos:
+                item_[0] = POS2ID[item_[0]] if item_[0] in POS2ID else POS2ID['other']
+            for item_ in ques_char_entity:
+                item_[0] = NER2ID[item_[0]]
+
             if is_training:
                 # 注：answer_labels字段和bridging_entity_labels字段均代表(docid, start, end)
 
@@ -290,12 +299,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                 doc_tokens = list(context_list[doc_id])
                 char_to_word_offset = list(range(len(doc_tokens)))
 
-                # 额外特征
+                # document特征
                 doc = sample['documents'][doc_id]
-
-                ques_char_pos = sample['ques_char_pos']
-                ques_char_kw = sample['ques_char_kw']
-                ques_char_entity = sample['ques_char_entity']
 
                 char_pos = doc['char_pos']
                 char_kw = doc['char_kw']
@@ -324,15 +329,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                 char_entity = doc['char_entity']
 
                 # 将pos和ner做映射
-                # for item_ in ques_char_pos:
-                #     item_[0] = POS2ID[item_[0]] if item_[0] in POS2ID else POS2ID['other']
-                # for item_ in ques_char_entity:
-                #     item_[0] = NER2ID[item_[0]]
-                ques_char_pos = [POS2ID[item_] if item_ in POS2ID else POS2ID['other']
-                                 for item_ in ques_char_pos]
-                ques_char_entity = [NER2ID[item_] for item_ in ques_char_entity.split(',')]
-                print(char_pos)
-                print(doc_id)
                 for item_ in char_pos:
                     item_[0] = POS2ID[item_[0]] if item_[0] in POS2ID else POS2ID['other']
                 for item_ in char_entity:
@@ -747,7 +743,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 mean_leve_dist_4gram.append(1.0)
                 mean_cos_dist_5gram.append(0.0)
                 mean_leve_dist_5gram.append(1.0)
-                char_entity.append(NER2ID['blank'])
+                char_entity.append(NER2ID[''])
 
             # Query
             for item_ in example.ques_char_pos:
@@ -819,7 +815,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             mean_leve_dist_4gram.append(1.0)
             mean_cos_dist_5gram.append(0.0)
             mean_leve_dist_5gram.append(1.0)
-            char_entity.append(NER2ID['blank'])
+            char_entity.append(NER2ID[''])
 
             # Paragraph
             for i in range(doc_span.length):
@@ -891,7 +887,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             mean_leve_dist_4gram.append(1.0)
             mean_cos_dist_5gram.append(0.0)
             mean_leve_dist_5gram.append(1.0)
-            char_entity.append(NER2ID['blank'])
+            char_entity.append(NER2ID[''])
 
             # CLS token at the end
             if cls_token_at_end:
@@ -939,7 +935,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 mean_leve_dist_4gram.append(1.0)
                 mean_cos_dist_5gram.append(0.0)
                 mean_leve_dist_5gram.append(1.0)
-                char_entity.append(NER2ID['blank'])
+                char_entity.append(NER2ID[''])
 
             assert len(input_ids) == max_seq_length
             assert len(input_mask) == max_seq_length
