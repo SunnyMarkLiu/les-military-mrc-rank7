@@ -20,8 +20,7 @@ def extract_match_features(sample):
     for doc in sample['documents']:
         sents = re.split('[，。！]', doc['content'])
 
-        doc['levenshtein_dist'], doc['longest_match_size'], doc['longest_match_ratio'] = [], [], []
-        doc['compression_dist'], doc['jaccard_coef'], doc['dice_dist'], doc['countbased_cos_distance'] = [], [], [], []
+        doc['longest_match_ratio'] = []
         doc['fuzzy_matching_ratio'], doc['fuzzy_matching_partial_ratio'], doc['fuzzy_matching_token_sort_ratio'] = [], [], []
         doc['fuzzy_matching_token_set_ratio'], doc['word_match_share'], doc['f1_score'] = [], [], []
         doc['mean_cos_dist_2gram'], doc['mean_leve_dist_2gram'], doc['mean_cos_dist_3gram'], doc['mean_leve_dist_3gram'] = [], [], [], []
@@ -36,13 +35,7 @@ def extract_match_features(sample):
                     sent_len -= 1
             doc['sent_lens'].append(sent_len)
 
-            doc['levenshtein_dist'].append(DistanceUtil.levenshtein_1(sent, que_str))
-            doc['longest_match_size'].append(DistanceUtil.longest_match_size(sent, que_str))
             doc['longest_match_ratio'].append(DistanceUtil.longest_match_ratio(sent, que_str))
-            doc['compression_dist'].append(DistanceUtil.compression_dist(sent, que_str))
-            doc['jaccard_coef'].append(DistanceUtil.jaccard_coef(sent, que_str))
-            doc['dice_dist'].append(DistanceUtil.dice_dist(sent, que_str))
-            doc['countbased_cos_distance'].append(DistanceUtil.countbased_cos_distance(sent, que_str))
             doc['fuzzy_matching_ratio'].append(DistanceUtil.fuzzy_matching_ratio(sent, que_str, ratio_func='ratio'))
             doc['fuzzy_matching_partial_ratio'].append(DistanceUtil.fuzzy_matching_ratio(sent, que_str, ratio_func='partial_ratio'))
             doc['fuzzy_matching_token_sort_ratio'].append(DistanceUtil.fuzzy_matching_ratio(sent, que_str, ratio_func='token_sort_ratio'))

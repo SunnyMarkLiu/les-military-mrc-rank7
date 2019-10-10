@@ -278,12 +278,7 @@ class BertForLesWithFeatures(BertPreTrainedModel):
         self.bert = BertModel(config)
 
         # 添加特征后的维度
-        # self.hidden_size = config.hidden_size + 21 + POS_DIM + NER_DIM + 2 + 2
         self.hidden_size = config.hidden_size + 14 + POS_DIM + NER_DIM + 2 + 2
-
-        # self.highway = Highway(input_dim=self.hidden_size, num_layers=2)
-
-        # self.linear = nn.Linear(self.hidden_size, config.hidden_size)
 
         self.qa_outputs = nn.Linear(self.hidden_size, config.num_labels)
 
@@ -295,13 +290,7 @@ class BertForLesWithFeatures(BertPreTrainedModel):
                 char_pos=None,
                 char_kw=None,
                 char_in_que=None,
-                levenshtein_dist=None,
-                longest_match_size=None,
                 longest_match_ratio=None,
-                compression_dist=None,
-                jaccard_coef=None,
-                dice_dist=None,
-                countbased_cos_distance=None,
                 fuzzy_matching_ratio=None,
                 fuzzy_matching_partial_ratio=None,
                 fuzzy_matching_token_sort_ratio=None,
@@ -330,24 +319,12 @@ class BertForLesWithFeatures(BertPreTrainedModel):
         char_in_que = F.one_hot(char_in_que, num_classes=2).float()
         # 拼接所有特征
         features = torch.stack([
-                                # 0.6902675925742418 (以下6个需筛选)
-                                # 以下3个加上是0.6806847215766747
-                                # levenshtein_dist,  # 0.6724398354685235
-                                # longest_match_size,  # 0.6717785707033533
-                                # longest_match_ratio,  # 0.6724033052973134
-                                # 0.6836400659562958
-                                # compression_dist,  # 0.6727330741564347
-                                # jaccard_coef,
-                                # dice_dist,
-                                # countbased_cos_distance,  # 会导致 loss NaN
-                                # 0.6990654143408181
                                 fuzzy_matching_ratio,
                                 fuzzy_matching_partial_ratio,
                                 fuzzy_matching_token_sort_ratio,
                                 fuzzy_matching_token_set_ratio,
                                 word_match_share,
                                 f1_score,
-                                # 0.6838707144274144
                                 mean_cos_dist_2gram,
                                 mean_leve_dist_2gram,
                                 mean_cos_dist_3gram,
@@ -356,19 +333,9 @@ class BertForLesWithFeatures(BertPreTrainedModel):
                                 mean_leve_dist_4gram,
                                 mean_cos_dist_5gram,
                                 mean_leve_dist_5gram], dim=2)
-        # 0.6777278562005111，pos，kw，ner，wiq
-        # baseline 0.6665517883564093
         features = torch.cat([char_pos, char_entity, char_kw, char_in_que, features], dim=-1)
 
         sequence_output = torch.cat([sequence_output, features], dim=-1)
-
-        # 添加highway层
-        # 1层：0.6868336425087759
-        # 2层：0.6611494966677305
-        # sequence_output = self.highway(sequence_output)
-
-        # 添加线性层 0.6562579255844909
-        # sequence_output = F.relu(self.linear(sequence_output))
 
         logits = self.qa_outputs(sequence_output)
         start_logits, end_logits = logits.split(1, dim=-1)

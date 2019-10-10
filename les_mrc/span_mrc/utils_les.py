@@ -68,13 +68,7 @@ class SquadExample(object):
                  char_pos=None,
                  char_kw=None,
                  char_in_que=None,
-                 levenshtein_dist=None,
-                 longest_match_size=None,
                  longest_match_ratio=None,
-                 compression_dist=None,
-                 jaccard_coef=None,
-                 dice_dist=None,
-                 countbased_cos_distance=None,
                  fuzzy_matching_ratio=None,
                  fuzzy_matching_partial_ratio=None,
                  fuzzy_matching_token_sort_ratio=None,
@@ -106,13 +100,7 @@ class SquadExample(object):
         self.char_pos = char_pos
         self.char_kw = char_kw
         self.char_in_que = char_in_que
-        self.levenshtein_dist = levenshtein_dist
-        self.longest_match_size = longest_match_size
         self.longest_match_ratio = longest_match_ratio
-        self.compression_dist = compression_dist
-        self.jaccard_coef = jaccard_coef
-        self.dice_dist = dice_dist
-        self.countbased_cos_distance = countbased_cos_distance
         self.fuzzy_matching_ratio = fuzzy_matching_ratio
         self.fuzzy_matching_partial_ratio = fuzzy_matching_partial_ratio
         self.fuzzy_matching_token_sort_ratio = fuzzy_matching_token_sort_ratio
@@ -214,13 +202,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                 char_pos = doc['char_pos']
                 char_kw = doc['char_kw']
                 char_in_que = doc['char_in_que']
-                levenshtein_dist = doc['levenshtein_dist']
-                longest_match_size = doc['longest_match_size']
                 longest_match_ratio = doc['longest_match_ratio']
-                compression_dist = doc['compression_dist']
-                jaccard_coef = doc['jaccard_coef']
-                dice_dist = doc['dice_dist']
-                countbased_cos_distance = doc['countbased_cos_distance']
                 fuzzy_matching_ratio = doc['fuzzy_matching_ratio']
                 fuzzy_matching_partial_ratio = doc['fuzzy_matching_partial_ratio']
                 fuzzy_matching_token_sort_ratio = doc['fuzzy_matching_token_sort_ratio']
@@ -243,9 +225,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                 for item_ in char_entity:
                     item_[0] = NER2ID[item_[0]]
 
-                # 将longest_match_size做归一化
-                for item_ in longest_match_size:
-                    item_[0] = item_[0] / len(question_text)
 
                 if is_training:
                     if doc_id in match_doc_ids:  # 该document有答案
@@ -278,13 +257,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                                 char_pos=char_pos,
                                 char_kw=char_kw,
                                 char_in_que=char_in_que,
-                                levenshtein_dist=levenshtein_dist,
-                                longest_match_size=longest_match_size,
                                 longest_match_ratio=longest_match_ratio,
-                                compression_dist=compression_dist,
-                                jaccard_coef=jaccard_coef,
-                                dice_dist=dice_dist,
-                                countbased_cos_distance=countbased_cos_distance,
                                 fuzzy_matching_ratio=fuzzy_matching_ratio,
                                 fuzzy_matching_partial_ratio=fuzzy_matching_partial_ratio,
                                 fuzzy_matching_token_sort_ratio=fuzzy_matching_token_sort_ratio,
@@ -324,13 +297,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                             char_pos=char_pos,
                             char_kw=char_kw,
                             char_in_que=char_in_que,
-                            levenshtein_dist=levenshtein_dist,
-                            longest_match_size=longest_match_size,
                             longest_match_ratio=longest_match_ratio,
-                            compression_dist=compression_dist,
-                            jaccard_coef=jaccard_coef,
-                            dice_dist=dice_dist,
-                            countbased_cos_distance=countbased_cos_distance,
                             fuzzy_matching_ratio=fuzzy_matching_ratio,
                             fuzzy_matching_partial_ratio=fuzzy_matching_partial_ratio,
                             fuzzy_matching_token_sort_ratio=fuzzy_matching_token_sort_ratio,
@@ -370,13 +337,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                         char_pos=char_pos,
                         char_kw=char_kw,
                         char_in_que=char_in_que,
-                        levenshtein_dist=levenshtein_dist,
-                        longest_match_size=longest_match_size,
                         longest_match_ratio=longest_match_ratio,
-                        compression_dist=compression_dist,
-                        jaccard_coef=jaccard_coef,
-                        dice_dist=dice_dist,
-                        countbased_cos_distance=countbased_cos_distance,
                         fuzzy_matching_ratio=fuzzy_matching_ratio,
                         fuzzy_matching_partial_ratio=fuzzy_matching_partial_ratio,
                         fuzzy_matching_token_sort_ratio=fuzzy_matching_token_sort_ratio,
@@ -530,13 +491,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
         char_pos_flat = get_flat_feat(example.char_pos)
         char_kw_flat = get_flat_feat(example.char_kw)
         char_in_que_flat = get_flat_feat(example.char_in_que)
-        levenshtein_dist_flat = get_flat_feat(example.levenshtein_dist)
-        longest_match_size_flat = get_flat_feat(example.longest_match_size)
         longest_match_ratio_flat = get_flat_feat(example.longest_match_ratio)
-        compression_dist_flat = get_flat_feat(example.compression_dist)
-        jaccard_coef_flat = get_flat_feat(example.jaccard_coef)
-        dice_dist_flat = get_flat_feat(example.dice_dist)
-        countbased_cos_distance_flat = get_flat_feat(example.countbased_cos_distance)
         fuzzy_matching_ratio_flat = get_flat_feat(example.fuzzy_matching_ratio)
         fuzzy_matching_partial_ratio_flat = get_flat_feat(example.fuzzy_matching_partial_ratio)
         fuzzy_matching_token_sort_ratio_flat = get_flat_feat(example.fuzzy_matching_token_sort_ratio)
@@ -563,13 +518,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             char_pos = []
             char_kw = []
             char_in_que = []
-            levenshtein_dist = []
-            longest_match_size = []
             longest_match_ratio = []
-            compression_dist = []
-            jaccard_coef = []
-            dice_dist = []
-            countbased_cos_distance = []
             fuzzy_matching_ratio = []
             fuzzy_matching_partial_ratio = []
             fuzzy_matching_token_sort_ratio = []
@@ -600,13 +549,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 char_pos.append(POS2ID['blank'])
                 char_kw.append(0)
                 char_in_que.append(0)
-                levenshtein_dist.append(1.0)
-                longest_match_size.append(0.0)
                 longest_match_ratio.append(0.0)
-                compression_dist.append(0.0)
-                jaccard_coef.append(0.0)
-                dice_dist.append(0.0)
-                countbased_cos_distance.append(0.0)
                 fuzzy_matching_ratio.append(0.0)
                 fuzzy_matching_partial_ratio.append(0.0)
                 fuzzy_matching_token_sort_ratio.append(0.0)
@@ -640,13 +583,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 p_mask.append(1)
 
                 char_in_que.append(0)
-                levenshtein_dist.append(1.0)
-                longest_match_size.append(0.0)
                 longest_match_ratio.append(0.0)
-                compression_dist.append(0.0)
-                jaccard_coef.append(0.0)
-                dice_dist.append(0.0)
-                countbased_cos_distance.append(0.0)
                 fuzzy_matching_ratio.append(0.0)
                 fuzzy_matching_partial_ratio.append(0.0)
                 fuzzy_matching_token_sort_ratio.append(0.0)
@@ -670,13 +607,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             char_pos.append(POS2ID['blank'])
             char_kw.append(0)
             char_in_que.append(0)
-            levenshtein_dist.append(1.0)
-            longest_match_size.append(0.0)
             longest_match_ratio.append(0.0)
-            compression_dist.append(0.0)
-            jaccard_coef.append(0.0)
-            dice_dist.append(0.0)
-            countbased_cos_distance.append(0.0)
             fuzzy_matching_ratio.append(0.0)
             fuzzy_matching_partial_ratio.append(0.0)
             fuzzy_matching_token_sort_ratio.append(0.0)
@@ -708,13 +639,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 char_pos.append(char_pos_flat[split_token_index])
                 char_kw.append(char_kw_flat[split_token_index])
                 char_in_que.append(char_in_que_flat[split_token_index])
-                levenshtein_dist.append(levenshtein_dist_flat[split_token_index])
-                longest_match_size.append(longest_match_size_flat[split_token_index])
                 longest_match_ratio.append(longest_match_ratio_flat[split_token_index])
-                compression_dist.append(compression_dist_flat[split_token_index])
-                jaccard_coef.append(jaccard_coef_flat[split_token_index])
-                dice_dist.append(dice_dist_flat[split_token_index])
-                countbased_cos_distance.append(countbased_cos_distance_flat[split_token_index])
                 fuzzy_matching_ratio.append(fuzzy_matching_ratio_flat[split_token_index])
                 fuzzy_matching_partial_ratio.append(fuzzy_matching_partial_ratio_flat[split_token_index])
                 fuzzy_matching_token_sort_ratio.append(fuzzy_matching_token_sort_ratio_flat[split_token_index])
@@ -740,13 +665,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             char_pos.append(POS2ID['blank'])
             char_kw.append(0)
             char_in_que.append(0)
-            levenshtein_dist.append(1.0)
-            longest_match_size.append(0.0)
             longest_match_ratio.append(0.0)
-            compression_dist.append(0.0)
-            jaccard_coef.append(0.0)
-            dice_dist.append(0.0)
-            countbased_cos_distance.append(0.0)
             fuzzy_matching_ratio.append(0.0)
             fuzzy_matching_partial_ratio.append(0.0)
             fuzzy_matching_token_sort_ratio.append(0.0)
@@ -786,13 +705,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 char_pos.append(POS2ID['blank'])
                 char_kw.append(0)
                 char_in_que.append(0)
-                levenshtein_dist.append(1.0)
-                longest_match_size.append(0.0)
                 longest_match_ratio.append(0.0)
-                compression_dist.append(0.0)
-                jaccard_coef.append(0.0)
-                dice_dist.append(0.0)
-                countbased_cos_distance.append(0.0)
                 fuzzy_matching_ratio.append(0.0)
                 fuzzy_matching_partial_ratio.append(0.0)
                 fuzzy_matching_token_sort_ratio.append(0.0)
@@ -816,13 +729,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             assert len(char_pos) == max_seq_length
             assert len(char_kw) == max_seq_length
             assert len(char_in_que) == max_seq_length
-            assert len(levenshtein_dist) == max_seq_length
-            assert len(longest_match_size) == max_seq_length
             assert len(longest_match_ratio) == max_seq_length
-            assert len(compression_dist) == max_seq_length
-            assert len(jaccard_coef) == max_seq_length
-            assert len(dice_dist) == max_seq_length
-            assert len(countbased_cos_distance) == max_seq_length
             assert len(fuzzy_matching_ratio) == max_seq_length
             assert len(fuzzy_matching_partial_ratio) == max_seq_length
             assert len(fuzzy_matching_token_sort_ratio) == max_seq_length
@@ -914,13 +821,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 'char_pos': char_pos,
                 'char_kw': char_kw,
                 'char_in_que': char_in_que,
-                'levenshtein_dist': levenshtein_dist,
-                'longest_match_size': longest_match_size,
                 'longest_match_ratio': longest_match_ratio,
-                'compression_dist': compression_dist,
-                'jaccard_coef': jaccard_coef,
-                'dice_dist': dice_dist,
-                'countbased_cos_distance': countbased_cos_distance,
                 'fuzzy_matching_ratio': fuzzy_matching_ratio,
                 'fuzzy_matching_partial_ratio': fuzzy_matching_partial_ratio,
                 'fuzzy_matching_token_sort_ratio': fuzzy_matching_token_sort_ratio,
