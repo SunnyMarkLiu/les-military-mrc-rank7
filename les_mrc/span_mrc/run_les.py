@@ -54,6 +54,7 @@ from utils_les_evaluate import evaluate_on_les_answer, evaluate_on_les_bridge_en
 from utils_les import ANSWER_MRC, BRIDGE_ENTITY_MRC
 
 from les_modeling import BertForLes, BertConcatTransformer, BertConcatBiGRU, BertSupportParaAnswerVerify, BertForLesWithFeatures
+from les_dataset import LazyLoadTensorDataset
 
 logger = logging.getLogger(__name__)
 
@@ -416,87 +417,8 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
     if args.local_rank == 0 and not evaluate:
         torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-    # Convert to Tensors and build dataset
-    # TODO 这里会加一些特征
-    input_ids = torch.tensor([f['input_ids'] for f in features], dtype=torch.long)
-    input_mask = torch.tensor([f['input_mask'] for f in features], dtype=torch.long)
-    segment_ids = torch.tensor([f['segment_ids'] for f in features], dtype=torch.long)
-    p_mask = torch.tensor([f['p_mask'] for f in features], dtype=torch.float)
-
-    doc_position = torch.tensor([f['doc_position'] for f in features], dtype=torch.long)
-
-    # 目前有25个特征
-    char_pos = torch.tensor([f['char_pos'] for f in features], dtype=torch.long)
-    char_kw = torch.tensor([f['char_kw'] for f in features], dtype=torch.long)
-    char_in_que = torch.tensor([f['char_in_que'] for f in features], dtype=torch.long)
-    fuzzy_matching_ratio = torch.tensor([f['fuzzy_matching_ratio'] for f in features], dtype=torch.float)
-    fuzzy_matching_partial_ratio = torch.tensor([f['fuzzy_matching_partial_ratio'] for f in features], dtype=torch.float)
-    fuzzy_matching_token_sort_ratio = torch.tensor([f['fuzzy_matching_token_sort_ratio'] for f in features], dtype=torch.float)
-    fuzzy_matching_token_set_ratio = torch.tensor([f['fuzzy_matching_token_set_ratio'] for f in features], dtype=torch.float)
-    word_match_share = torch.tensor([f['word_match_share'] for f in features], dtype=torch.float)
-    f1_score = torch.tensor([f['f1_score'] for f in features], dtype=torch.float)
-    mean_cos_dist_2gram = torch.tensor([f['mean_cos_dist_2gram'] for f in features], dtype=torch.float)
-    mean_leve_dist_2gram = torch.tensor([f['mean_leve_dist_2gram'] for f in features], dtype=torch.float)
-    mean_cos_dist_3gram = torch.tensor([f['mean_cos_dist_3gram'] for f in features], dtype=torch.float)
-    mean_leve_dist_3gram = torch.tensor([f['mean_leve_dist_3gram'] for f in features], dtype=torch.float)
-    mean_cos_dist_4gram = torch.tensor([f['mean_cos_dist_4gram'] for f in features], dtype=torch.float)
-    mean_leve_dist_4gram = torch.tensor([f['mean_leve_dist_4gram'] for f in features], dtype=torch.float)
-    mean_cos_dist_5gram = torch.tensor([f['mean_cos_dist_5gram'] for f in features], dtype=torch.float)
-    mean_leve_dist_5gram = torch.tensor([f['mean_leve_dist_5gram'] for f in features], dtype=torch.float)
-    char_entity = torch.tensor([f['char_entity'] for f in features], dtype=torch.long)
-
-    if evaluate:
-        example_index = torch.arange(input_ids.size(0), dtype=torch.long)
-        dataset = TensorDataset(input_ids, input_mask, segment_ids,
-                                p_mask,
-                                doc_position,
-                                char_pos,
-                                char_kw,
-                                char_in_que,
-                                fuzzy_matching_ratio,
-                                fuzzy_matching_partial_ratio,
-                                fuzzy_matching_token_sort_ratio,
-                                fuzzy_matching_token_set_ratio,
-                                word_match_share,
-                                f1_score,
-                                mean_cos_dist_2gram,
-                                mean_leve_dist_2gram,
-                                mean_cos_dist_3gram,
-                                mean_leve_dist_3gram,
-                                mean_cos_dist_4gram,
-                                mean_leve_dist_4gram,
-                                mean_cos_dist_5gram,
-                                mean_leve_dist_5gram,
-                                char_entity,
-
-                                example_index)
-    else:
-        start_positions = torch.tensor([f['start_position'] for f in features], dtype=torch.long)
-        end_positions = torch.tensor([f['end_position'] for f in features], dtype=torch.long)
-        dataset = TensorDataset(input_ids, input_mask, segment_ids,
-                                p_mask,
-                                doc_position,
-                                char_pos,
-                                char_kw,
-                                char_in_que,
-                                fuzzy_matching_ratio,
-                                fuzzy_matching_partial_ratio,
-                                fuzzy_matching_token_sort_ratio,
-                                fuzzy_matching_token_set_ratio,
-                                word_match_share,
-                                f1_score,
-                                mean_cos_dist_2gram,
-                                mean_leve_dist_2gram,
-                                mean_cos_dist_3gram,
-                                mean_leve_dist_3gram,
-                                mean_cos_dist_4gram,
-                                mean_leve_dist_4gram,
-                                mean_cos_dist_5gram,
-                                mean_leve_dist_5gram,
-                                char_entity,
-
-                                start_positions,
-                                end_positions)
+    # build memory-free lazy-load dataset
+    dataset = LazyLoadTensorDataset(features, is_training=not evaluate)
 
     if output_examples:
         logger.info("Reading examples from dataset file at %s", input_file)

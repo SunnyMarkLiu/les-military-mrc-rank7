@@ -354,6 +354,26 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
     return examples
 
 
+# 特征展开
+def flat_feature_list(input_):
+    index = []
+    for item_ in input_:
+        index += [item_[0]] * item_[1]
+    return index
+
+def dense_feature_list(feat_list):
+    feat_list = [0 if x == 'NaN' else x for x in feat_list]
+    feat_len_list = [(None, 0)]
+    i = 0
+    while i < len(feat_list):
+        if feat_list[i] != feat_len_list[-1][0]:  # 新的特征值
+            feat_len_list.append((feat_list[i], 1))
+        else:
+            feat_len_list[-1] = (feat_len_list[-1][0], feat_len_list[-1][1] + 1)
+        i += 1
+    return feat_len_list[1:]
+
+
 def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                                  doc_stride, max_query_length, is_training,
                                  cls_token_at_end=False,
@@ -476,30 +496,24 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 break
             start_offset += min(length, doc_stride)
 
-        # 特征展开
-        def get_flat_feat(input_):
-            index = []
-            for item_ in input_:
-                index += [item_[0]] * item_[1]
-            return index
-        char_pos_flat = get_flat_feat(example.char_pos)
-        char_kw_flat = get_flat_feat(example.char_kw)
-        char_in_que_flat = get_flat_feat(example.char_in_que)
-        fuzzy_matching_ratio_flat = get_flat_feat(example.fuzzy_matching_ratio)
-        fuzzy_matching_partial_ratio_flat = get_flat_feat(example.fuzzy_matching_partial_ratio)
-        fuzzy_matching_token_sort_ratio_flat = get_flat_feat(example.fuzzy_matching_token_sort_ratio)
-        fuzzy_matching_token_set_ratio_flat = get_flat_feat(example.fuzzy_matching_token_set_ratio)
-        word_match_share_flat = get_flat_feat(example.word_match_share)
-        f1_score_flat = get_flat_feat(example.f1_score)
-        mean_cos_dist_2gram_flat = get_flat_feat(example.mean_cos_dist_2gram)
-        mean_leve_dist_2gram_flat = get_flat_feat(example.mean_leve_dist_2gram)
-        mean_cos_dist_3gram_flat = get_flat_feat(example.mean_cos_dist_3gram)
-        mean_leve_dist_3gram_flat = get_flat_feat(example.mean_leve_dist_3gram)
-        mean_cos_dist_4gram_flat = get_flat_feat(example.mean_cos_dist_4gram)
-        mean_leve_dist_4gram_flat = get_flat_feat(example.mean_leve_dist_4gram)
-        mean_cos_dist_5gram_flat = get_flat_feat(example.mean_cos_dist_5gram)
-        mean_leve_dist_5gram_flat = get_flat_feat(example.mean_leve_dist_5gram)
-        char_entity_flat = get_flat_feat(example.char_entity)
+        char_pos_flat = flat_feature_list(example.char_pos)
+        char_kw_flat = flat_feature_list(example.char_kw)
+        char_in_que_flat = flat_feature_list(example.char_in_que)
+        fuzzy_matching_ratio_flat = flat_feature_list(example.fuzzy_matching_ratio)
+        fuzzy_matching_partial_ratio_flat = flat_feature_list(example.fuzzy_matching_partial_ratio)
+        fuzzy_matching_token_sort_ratio_flat = flat_feature_list(example.fuzzy_matching_token_sort_ratio)
+        fuzzy_matching_token_set_ratio_flat = flat_feature_list(example.fuzzy_matching_token_set_ratio)
+        word_match_share_flat = flat_feature_list(example.word_match_share)
+        f1_score_flat = flat_feature_list(example.f1_score)
+        mean_cos_dist_2gram_flat = flat_feature_list(example.mean_cos_dist_2gram)
+        mean_leve_dist_2gram_flat = flat_feature_list(example.mean_leve_dist_2gram)
+        mean_cos_dist_3gram_flat = flat_feature_list(example.mean_cos_dist_3gram)
+        mean_leve_dist_3gram_flat = flat_feature_list(example.mean_leve_dist_3gram)
+        mean_cos_dist_4gram_flat = flat_feature_list(example.mean_cos_dist_4gram)
+        mean_leve_dist_4gram_flat = flat_feature_list(example.mean_leve_dist_4gram)
+        mean_cos_dist_5gram_flat = flat_feature_list(example.mean_cos_dist_5gram)
+        mean_leve_dist_5gram_flat = flat_feature_list(example.mean_leve_dist_5gram)
+        char_entity_flat = flat_feature_list(example.char_entity)
 
         for (doc_span_index, doc_span) in enumerate(doc_spans):
             tokens = []
@@ -534,201 +548,198 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             # CLS token at the beginning, 本次比赛默认是在最前面, 不然有些代码需要调整
             if not cls_token_at_end:
                 tokens.append(cls_token)
-                segment_ids.append(cls_token_segment_id)
-                p_mask.append(0)
+                segment_ids = [(cls_token_segment_id, 1)]
+                p_mask = [(0, 1)]
                 cls_index = 0
 
-                char_pos.append(POS2ID['blank'])
-                char_kw.append(0)
-                char_in_que.append(0)
-                fuzzy_matching_ratio.append(0.0)
-                fuzzy_matching_partial_ratio.append(0.0)
-                fuzzy_matching_token_sort_ratio.append(0.0)
-                fuzzy_matching_token_set_ratio.append(0.0)
-                word_match_share.append(0.0)
-                f1_score.append(0.0)
-                mean_cos_dist_2gram.append(0.0)
-                mean_leve_dist_2gram.append(1.0)
-                mean_cos_dist_3gram.append(0.0)
-                mean_leve_dist_3gram.append(1.0)
-                mean_cos_dist_4gram.append(0.0)
-                mean_leve_dist_4gram.append(1.0)
-                mean_cos_dist_5gram.append(0.0)
-                mean_leve_dist_5gram.append(1.0)
-                char_entity.append(NER2ID[''])
+                char_pos = [(POS2ID['blank'], 1)]
+                char_kw = [(0, 1)]
+                char_in_que = [(0, 1)]
+                char_entity = [(NER2ID[''], 1)]
+                fuzzy_matching_ratio = [(0, 1)]
+                fuzzy_matching_partial_ratio = [(0, 1)]
+                fuzzy_matching_token_sort_ratio = [(0, 1)]
+                fuzzy_matching_token_set_ratio = [(0, 1)]
+                word_match_share = [(0, 1)]
+                f1_score = [(0, 1)]
+                mean_cos_dist_2gram = [(0, 1)]
+                mean_leve_dist_2gram = [(1, 1)]
+                mean_cos_dist_3gram = [(0, 1)]
+                mean_leve_dist_3gram = [(1, 1)]
+                mean_cos_dist_4gram = [(0, 1)]
+                mean_leve_dist_4gram = [(1, 1)]
+                mean_cos_dist_5gram = [(0, 1)]
+                mean_leve_dist_5gram = [(1, 1)]
 
             # Query
-            for item_ in example.ques_char_pos:
-                char_pos += [item_[0]] * item_[1]
-            for item_ in example.ques_char_kw:
-                char_kw += [item_[0]] * item_[1]
-            for item_ in example.ques_char_entity:
-                char_entity += [item_[0]] * item_[1]
-            char_pos = char_pos[:len(query_tokens) + 1]
-            char_kw = char_kw[:len(query_tokens) + 1]
-            char_entity = char_entity[:len(query_tokens) + 1]
+            char_pos += example.ques_char_pos
+            char_kw += example.ques_char_kw
+            char_in_que += [(0, len(query_tokens))]
+            char_entity += example.ques_char_entity
+            fuzzy_matching_ratio += [(0, len(query_tokens))]
+            fuzzy_matching_partial_ratio += [(0, len(query_tokens))]
+            fuzzy_matching_token_sort_ratio += [(0, len(query_tokens))]
+            fuzzy_matching_token_set_ratio += [(0, len(query_tokens))]
+            word_match_share += [(0, len(query_tokens))]
+            f1_score += [(0, len(query_tokens))]
+            mean_cos_dist_2gram += [(0, len(query_tokens))]
+            mean_leve_dist_2gram += [(0, len(query_tokens))]
+            mean_cos_dist_3gram += [(0, len(query_tokens))]
+            mean_leve_dist_3gram += [(0, len(query_tokens))]
+            mean_cos_dist_4gram += [(0, len(query_tokens))]
+            mean_leve_dist_4gram += [(0, len(query_tokens))]
+            mean_cos_dist_5gram += [(0, len(query_tokens))]
+            mean_leve_dist_5gram += [(0, len(query_tokens))]
 
-            for token in query_tokens:
-                tokens.append(token)
-                segment_ids.append(sequence_a_segment_id)
-                p_mask.append(1)
+            # 此处根据question截断的更新 char_pos，char_kw，char_entity 列表
+            tmp = []
+            for item_ in char_pos:
+                tmp += [item_[0]] * item_[1]
+            char_pos = tmp[:len(query_tokens) + 1]
+            char_pos = dense_feature_list(char_pos)
 
-                char_in_que.append(0)
-                fuzzy_matching_ratio.append(0.0)
-                fuzzy_matching_partial_ratio.append(0.0)
-                fuzzy_matching_token_sort_ratio.append(0.0)
-                fuzzy_matching_token_set_ratio.append(0.0)
-                word_match_share.append(0.0)
-                f1_score.append(0.0)
-                mean_cos_dist_2gram.append(0.0)
-                mean_leve_dist_2gram.append(1.0)
-                mean_cos_dist_3gram.append(0.0)
-                mean_leve_dist_3gram.append(1.0)
-                mean_cos_dist_4gram.append(0.0)
-                mean_leve_dist_4gram.append(1.0)
-                mean_cos_dist_5gram.append(0.0)
-                mean_leve_dist_5gram.append(1.0)
+            tmp = []
+            for item_ in char_kw:
+                tmp += [item_[0]] * item_[1]
+            char_kw = tmp[:len(query_tokens) + 1]
+            char_kw = dense_feature_list(char_kw)
+
+            tmp = []
+            for item_ in char_in_que:
+                tmp += [item_[0]] * item_[1]
+            char_in_que = tmp[:len(query_tokens) + 1]
+            char_in_que = dense_feature_list(char_in_que)
+
+            tmp = []
+            for item_ in char_entity:
+                tmp += [item_[0]] * item_[1]
+            char_entity = tmp[:len(query_tokens) + 1]
+            char_entity = dense_feature_list(char_entity)
+
+            tokens += query_tokens
+            segment_ids.append((sequence_a_segment_id, len(query_tokens)))
+            p_mask.append((1, len(query_tokens)))
 
             # SEP token
             tokens.append(sep_token)
-            segment_ids.append(sequence_a_segment_id)
-            p_mask.append(1)
+            segment_ids.append((sequence_b_segment_id, 1))
+            p_mask.append((1, 1))
 
-            char_pos.append(POS2ID['blank'])
-            char_kw.append(0)
-            char_in_que.append(0)
-            fuzzy_matching_ratio.append(0.0)
-            fuzzy_matching_partial_ratio.append(0.0)
-            fuzzy_matching_token_sort_ratio.append(0.0)
-            fuzzy_matching_token_set_ratio.append(0.0)
-            word_match_share.append(0.0)
-            f1_score.append(0.0)
-            mean_cos_dist_2gram.append(0.0)
-            mean_leve_dist_2gram.append(1.0)
-            mean_cos_dist_3gram.append(0.0)
-            mean_leve_dist_3gram.append(1.0)
-            mean_cos_dist_4gram.append(0.0)
-            mean_leve_dist_4gram.append(1.0)
-            mean_cos_dist_5gram.append(0.0)
-            mean_leve_dist_5gram.append(1.0)
-            char_entity.append(NER2ID[''])
+            char_pos.append((POS2ID['blank'], 1))
+            char_kw.append((0, 1))
+            char_in_que.append((0, 1))
+            char_entity.append((NER2ID[''], 1))
+            fuzzy_matching_ratio.append((0, 1))
+            fuzzy_matching_partial_ratio.append((0, 1))
+            fuzzy_matching_token_sort_ratio.append((0, 1))
+            fuzzy_matching_token_set_ratio.append((0, 1))
+            word_match_share.append((0, 1))
+            f1_score.append((0, 1))
+            mean_cos_dist_2gram.append((0, 1))
+            mean_leve_dist_2gram.append((1, 1))
+            mean_cos_dist_3gram.append((0, 1))
+            mean_leve_dist_3gram.append((1, 1))
+            mean_cos_dist_4gram.append((0, 1))
+            mean_leve_dist_4gram.append((1, 1))
+            mean_cos_dist_5gram.append((0, 1))
+            mean_leve_dist_5gram.append((1, 1))
 
             # Paragraph
             for i in range(doc_span.length):
                 split_token_index = doc_span.start + i
                 token_to_orig_map[len(tokens)] = tok_to_orig_index[split_token_index]
-
-                is_max_context = _check_is_max_context(doc_spans, doc_span_index,
-                                                       split_token_index)
+                is_max_context = _check_is_max_context(doc_spans, doc_span_index, split_token_index)
                 token_is_max_context[len(tokens)] = is_max_context
-                tokens.append(all_doc_tokens[split_token_index])
-                segment_ids.append(sequence_b_segment_id)
-                p_mask.append(0)
 
-                char_pos.append(char_pos_flat[split_token_index])
-                char_kw.append(char_kw_flat[split_token_index])
-                char_in_que.append(char_in_que_flat[split_token_index])
-                fuzzy_matching_ratio.append(fuzzy_matching_ratio_flat[split_token_index])
-                fuzzy_matching_partial_ratio.append(fuzzy_matching_partial_ratio_flat[split_token_index])
-                fuzzy_matching_token_sort_ratio.append(fuzzy_matching_token_sort_ratio_flat[split_token_index])
-                fuzzy_matching_token_set_ratio.append(fuzzy_matching_token_set_ratio_flat[split_token_index])
-                word_match_share.append(word_match_share_flat[split_token_index])
-                f1_score.append(f1_score_flat[split_token_index])
-                mean_cos_dist_2gram.append(mean_cos_dist_2gram_flat[split_token_index])
-                mean_leve_dist_2gram.append(mean_leve_dist_2gram_flat[split_token_index])
-                mean_cos_dist_3gram.append(mean_cos_dist_3gram_flat[split_token_index])
-                mean_leve_dist_3gram.append(mean_leve_dist_3gram_flat[split_token_index])
-                mean_cos_dist_4gram.append(mean_cos_dist_4gram_flat[split_token_index])
-                mean_leve_dist_4gram.append(mean_leve_dist_4gram_flat[split_token_index])
-                mean_cos_dist_5gram.append(mean_cos_dist_5gram_flat[split_token_index])
-                mean_leve_dist_5gram.append(mean_leve_dist_5gram_flat[split_token_index])
-                char_entity.append(char_entity_flat[split_token_index])
+            tokens += all_doc_tokens[doc_span.start: doc_span.start + doc_span.length]
+            segment_ids.append((sequence_b_segment_id, doc_span.length))
+            p_mask.append((0, doc_span.length))
+
+            # doc 的特征
+            char_pos += dense_feature_list(char_pos_flat[doc_span.start: doc_span.start + doc_span.length])
+            char_kw += dense_feature_list(char_kw_flat[doc_span.start: doc_span.start + doc_span.length])
+            char_in_que += dense_feature_list(char_in_que_flat[doc_span.start: doc_span.start + doc_span.length])
+            char_entity += dense_feature_list(char_entity_flat[doc_span.start: doc_span.start + doc_span.length])
+            fuzzy_matching_ratio += dense_feature_list(fuzzy_matching_ratio_flat[doc_span.start: doc_span.start + doc_span.length])
+            fuzzy_matching_partial_ratio += dense_feature_list(fuzzy_matching_partial_ratio_flat[doc_span.start: doc_span.start + doc_span.length])
+            fuzzy_matching_token_sort_ratio += dense_feature_list(fuzzy_matching_token_sort_ratio_flat[doc_span.start: doc_span.start + doc_span.length])
+            fuzzy_matching_token_set_ratio += dense_feature_list(fuzzy_matching_token_set_ratio_flat[doc_span.start: doc_span.start + doc_span.length])
+            word_match_share += dense_feature_list(word_match_share_flat[doc_span.start: doc_span.start + doc_span.length])
+            f1_score += dense_feature_list(f1_score_flat[doc_span.start: doc_span.start + doc_span.length])
+            mean_cos_dist_2gram += dense_feature_list(mean_cos_dist_2gram_flat[doc_span.start: doc_span.start + doc_span.length])
+            mean_leve_dist_2gram += dense_feature_list(mean_leve_dist_2gram_flat[doc_span.start: doc_span.start + doc_span.length])
+            mean_cos_dist_3gram += dense_feature_list(mean_cos_dist_3gram_flat[doc_span.start: doc_span.start + doc_span.length])
+            mean_leve_dist_3gram += dense_feature_list(mean_leve_dist_3gram_flat[doc_span.start: doc_span.start + doc_span.length])
+            mean_cos_dist_4gram += dense_feature_list(mean_cos_dist_4gram_flat[doc_span.start: doc_span.start + doc_span.length])
+            mean_leve_dist_4gram += dense_feature_list(mean_leve_dist_4gram_flat[doc_span.start: doc_span.start + doc_span.length])
+            mean_cos_dist_5gram += dense_feature_list(mean_cos_dist_5gram_flat[doc_span.start: doc_span.start + doc_span.length])
+            mean_leve_dist_5gram += dense_feature_list(mean_leve_dist_5gram_flat[doc_span.start: doc_span.start + doc_span.length])
+
             paragraph_len = doc_span.length
 
             # SEP token
             tokens.append(sep_token)
-            segment_ids.append(sequence_b_segment_id)
-            p_mask.append(1)
+            segment_ids.append((sequence_b_segment_id, 1))
+            p_mask.append((1, 1))
 
-            char_pos.append(POS2ID['blank'])
-            char_kw.append(0)
-            char_in_que.append(0)
-            fuzzy_matching_ratio.append(0.0)
-            fuzzy_matching_partial_ratio.append(0.0)
-            fuzzy_matching_token_sort_ratio.append(0.0)
-            fuzzy_matching_token_set_ratio.append(0.0)
-            word_match_share.append(0.0)
-            f1_score.append(0.0)
-            mean_cos_dist_2gram.append(0.0)
-            mean_leve_dist_2gram.append(1.0)
-            mean_cos_dist_3gram.append(0.0)
-            mean_leve_dist_3gram.append(1.0)
-            mean_cos_dist_4gram.append(0.0)
-            mean_leve_dist_4gram.append(1.0)
-            mean_cos_dist_5gram.append(0.0)
-            mean_leve_dist_5gram.append(1.0)
-            char_entity.append(NER2ID[''])
+            char_pos.append((POS2ID['blank'], 1))
+            char_kw.append((0, 1))
+            char_in_que.append((0, 1))
+            char_entity.append((NER2ID[''], 1))
+            fuzzy_matching_ratio.append((0, 1))
+            fuzzy_matching_partial_ratio.append((0, 1))
+            fuzzy_matching_token_sort_ratio.append((0, 1))
+            fuzzy_matching_token_set_ratio.append((0, 1))
+            word_match_share.append((0, 1))
+            f1_score.append((0, 1))
+            mean_cos_dist_2gram.append((0, 1))
+            mean_leve_dist_2gram.append((1, 1))
+            mean_cos_dist_3gram.append((0, 1))
+            mean_leve_dist_3gram.append((1, 1))
+            mean_cos_dist_4gram.append((0, 1))
+            mean_leve_dist_4gram.append((1, 1))
+            mean_cos_dist_5gram.append((0, 1))
+            mean_leve_dist_5gram.append((1, 1))
 
             # CLS token at the end
             if cls_token_at_end:
                 tokens.append(cls_token)
-                segment_ids.append(cls_token_segment_id)
-                p_mask.append(0)
+                segment_ids.append((cls_token_segment_id, 1))
+                p_mask.append((0, 1))
                 cls_index = len(tokens) - 1  # Index of classification token
 
             input_ids = tokenizer.convert_tokens_to_ids(tokens)
 
             # The mask has 1 for real tokens and 0 for padding tokens. Only real
             # tokens are attended to.
-            input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
+            input_mask = [(1 if mask_padding_with_zero else 0, len(input_ids))]
 
             # Zero-pad up to the sequence length.
-            while len(input_ids) < max_seq_length:
-                input_ids.append(pad_token)
-                input_mask.append(0 if mask_padding_with_zero else 1)
-                segment_ids.append(pad_token_segment_id)
-                p_mask.append(1)
+            pad_len = max_seq_length - len(input_ids)
+            if pad_len > 0:
+                input_ids += [pad_token] * pad_len
+                input_mask.append((0 if mask_padding_with_zero else 1, pad_len))
+                segment_ids.append((pad_token_segment_id, pad_len))
+                p_mask.append((1, pad_len))
 
-                char_pos.append(POS2ID['blank'])
-                char_kw.append(0)
-                char_in_que.append(0)
-                fuzzy_matching_ratio.append(0.0)
-                fuzzy_matching_partial_ratio.append(0.0)
-                fuzzy_matching_token_sort_ratio.append(0.0)
-                fuzzy_matching_token_set_ratio.append(0.0)
-                word_match_share.append(0.0)
-                f1_score.append(0.0)
-                mean_cos_dist_2gram.append(0.0)
-                mean_leve_dist_2gram.append(1.0)
-                mean_cos_dist_3gram.append(0.0)
-                mean_leve_dist_3gram.append(1.0)
-                mean_cos_dist_4gram.append(0.0)
-                mean_leve_dist_4gram.append(1.0)
-                mean_cos_dist_5gram.append(0.0)
-                mean_leve_dist_5gram.append(1.0)
-                char_entity.append(NER2ID[''])
-
-            assert len(input_ids) == max_seq_length
-            assert len(input_mask) == max_seq_length
-            assert len(segment_ids) == max_seq_length
-
-            assert len(char_pos) == max_seq_length
-            assert len(char_kw) == max_seq_length
-            assert len(char_in_que) == max_seq_length
-            assert len(fuzzy_matching_ratio) == max_seq_length
-            assert len(fuzzy_matching_partial_ratio) == max_seq_length
-            assert len(fuzzy_matching_token_sort_ratio) == max_seq_length
-            assert len(fuzzy_matching_token_set_ratio) == max_seq_length
-            assert len(word_match_share) == max_seq_length
-            assert len(f1_score) == max_seq_length
-            assert len(mean_cos_dist_2gram) == max_seq_length
-            assert len(mean_leve_dist_2gram) == max_seq_length
-            assert len(mean_cos_dist_3gram) == max_seq_length
-            assert len(mean_leve_dist_3gram) == max_seq_length
-            assert len(mean_cos_dist_4gram) == max_seq_length
-            assert len(mean_leve_dist_4gram) == max_seq_length
-            assert len(mean_cos_dist_5gram) == max_seq_length
-            assert len(mean_leve_dist_5gram) == max_seq_length
+                char_pos.append((POS2ID['blank'], pad_len))
+                char_kw.append((0, pad_len))
+                char_in_que.append((0, pad_len))
+                char_entity.append((NER2ID[''], pad_len))
+                fuzzy_matching_ratio.append((0, pad_len))
+                fuzzy_matching_partial_ratio.append((0, pad_len))
+                fuzzy_matching_token_sort_ratio.append((0, pad_len))
+                fuzzy_matching_token_set_ratio.append((0, pad_len))
+                word_match_share.append((0, pad_len))
+                f1_score.append((0, pad_len))
+                mean_cos_dist_2gram.append((0, pad_len))
+                mean_leve_dist_2gram.append((1, pad_len))
+                mean_cos_dist_3gram.append((0, pad_len))
+                mean_leve_dist_3gram.append((1, pad_len))
+                mean_cos_dist_4gram.append((0, pad_len))
+                mean_leve_dist_4gram.append((1, pad_len))
+                mean_cos_dist_5gram.append((0, pad_len))
+                mean_leve_dist_5gram.append((1, pad_len))
 
             span_is_impossible = example.is_impossible
             start_position = None
@@ -761,33 +772,30 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 start_position = cls_index
                 end_position = cls_index
 
-            if example_index < 0:
-                logger.info("*** Example ***")
-                logger.info("unique_id: %s" % (unique_id))
-                logger.info("qas_id: %s" % (example.qas_id))
-                logger.info("doc_position: %s" % (example.doc_position))
-                logger.info("example_index: %s" % (example_index))
-                logger.info("doc_span_index: %s" % (doc_span_index))
-                logger.info("tokens: %s" % " ".join(tokens))
-                logger.info("token_to_orig_map: %s" % " ".join([
-                    "%d:%d" % (x, y) for (x, y) in token_to_orig_map.items()]))
-                logger.info("token_is_max_context: %s" % " ".join([
-                    "%d:%s" % (x, y) for (x, y) in token_is_max_context.items()
-                ]))
-                logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-                logger.info(
-                    "input_mask: %s" % " ".join([str(x) for x in input_mask]))
-                logger.info(
-                    "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-                if is_training and span_is_impossible:
-                    logger.info("impossible example")
-                if is_training and not span_is_impossible:
-                    answer_text = " ".join(tokens[start_position:(end_position + 1)])
-                    logger.info("start_position: %d" % (start_position))
-                    logger.info("end_position: %d" % (end_position))
-                    logger.info("answer: %s" % (answer_text))
+            # 检查特征压缩是否正确
+            assert sum([i[1] for i in input_mask]) == max_seq_length
+            assert sum([i[1] for i in segment_ids]) == max_seq_length
+            assert sum([i[1] for i in p_mask]) == max_seq_length
+            assert sum([i[1] for i in char_pos]) == max_seq_length
+            assert sum([i[1] for i in char_kw]) == max_seq_length
+            assert sum([i[1] for i in char_in_que]) == max_seq_length
+            assert sum([i[1] for i in fuzzy_matching_ratio]) == max_seq_length
+            assert sum([i[1] for i in fuzzy_matching_partial_ratio]) == max_seq_length
+            assert sum([i[1] for i in fuzzy_matching_token_sort_ratio]) == max_seq_length
+            assert sum([i[1] for i in fuzzy_matching_token_set_ratio]) == max_seq_length
+            assert sum([i[1] for i in word_match_share]) == max_seq_length
+            assert sum([i[1] for i in f1_score]) == max_seq_length
+            assert sum([i[1] for i in mean_cos_dist_2gram]) == max_seq_length
+            assert sum([i[1] for i in mean_leve_dist_2gram]) == max_seq_length
+            assert sum([i[1] for i in mean_cos_dist_3gram]) == max_seq_length
+            assert sum([i[1] for i in mean_leve_dist_3gram]) == max_seq_length
+            assert sum([i[1] for i in mean_cos_dist_4gram]) == max_seq_length
+            assert sum([i[1] for i in mean_leve_dist_4gram]) == max_seq_length
+            assert sum([i[1] for i in mean_cos_dist_5gram]) == max_seq_length
+            assert sum([i[1] for i in mean_leve_dist_5gram]) == max_seq_length
+            assert sum([i[1] for i in char_entity]) == max_seq_length
 
-            features.append({
+            feature = {
                 'unique_id': unique_id,
                 'example_index': example_index,
                 'doc_span_index': doc_span_index,
@@ -820,7 +828,10 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 'mean_leve_dist_4gram': mean_leve_dist_4gram,
                 'mean_cos_dist_5gram': mean_cos_dist_5gram,
                 'mean_leve_dist_5gram': mean_leve_dist_5gram,
-                'char_entity': char_entity})
+                'char_entity': char_entity}
+            if example_index < 0:
+                print(json.dumps(feature, ensure_ascii=False))
+            features.append(feature)
             unique_id += 1
 
     # 打印未识别或者被跳过的token
