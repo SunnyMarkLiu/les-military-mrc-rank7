@@ -290,7 +290,6 @@ class BertForLesWithFeatures(BertPreTrainedModel):
                 char_pos=None,
                 char_kw=None,
                 char_in_que=None,
-                longest_match_ratio=None,
                 fuzzy_matching_ratio=None,
                 fuzzy_matching_partial_ratio=None,
                 fuzzy_matching_token_sort_ratio=None,

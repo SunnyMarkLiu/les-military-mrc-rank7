@@ -152,27 +152,26 @@ def train(args, train_dataset, model, tokenizer):
                 'char_pos': batch[5],
                 'char_kw': batch[6],
                 'char_in_que': batch[7],
-                'longest_match_ratio': batch[8],
-                'fuzzy_matching_ratio': batch[9],
-                'fuzzy_matching_partial_ratio': batch[10],
-                'fuzzy_matching_token_sort_ratio': batch[11],
-                'fuzzy_matching_token_set_ratio': batch[12],
-                'word_match_share': batch[13],
-                'f1_score': batch[14],
-                'mean_cos_dist_2gram': batch[15],
-                'mean_leve_dist_2gram': batch[16],
-                'mean_cos_dist_3gram': batch[17],
-                'mean_leve_dist_3gram': batch[18],
-                'mean_cos_dist_4gram': batch[19],
-                'mean_leve_dist_4gram': batch[20],
-                'mean_cos_dist_5gram': batch[21],
-                'mean_leve_dist_5gram': batch[22],
-                'char_entity': batch[23]
+                'fuzzy_matching_ratio': batch[8],
+                'fuzzy_matching_partial_ratio': batch[9],
+                'fuzzy_matching_token_sort_ratio': batch[10],
+                'fuzzy_matching_token_set_ratio': batch[11],
+                'word_match_share': batch[12],
+                'f1_score': batch[13],
+                'mean_cos_dist_2gram': batch[14],
+                'mean_leve_dist_2gram': batch[15],
+                'mean_cos_dist_3gram': batch[16],
+                'mean_leve_dist_3gram': batch[17],
+                'mean_cos_dist_4gram': batch[18],
+                'mean_leve_dist_4gram': batch[19],
+                'mean_cos_dist_5gram': batch[20],
+                'mean_leve_dist_5gram': batch[21],
+                'char_entity': batch[22]
             }
 
             inputs.update({
-                'start_positions': batch[24],
-                'end_positions': batch[25]
+                'start_positions': batch[23],
+                'end_positions': batch[24]
             })
 
             outputs = model(**inputs)
@@ -278,25 +277,24 @@ def evaluate(args, model, tokenizer, prefix="les"):
                 'char_pos': batch[5],
                 'char_kw': batch[6],
                 'char_in_que': batch[7],
-                'longest_match_ratio': batch[8],
-                'fuzzy_matching_ratio': batch[9],
-                'fuzzy_matching_partial_ratio': batch[10],
-                'fuzzy_matching_token_sort_ratio': batch[11],
-                'fuzzy_matching_token_set_ratio': batch[12],
-                'word_match_share': batch[13],
-                'f1_score': batch[14],
-                'mean_cos_dist_2gram': batch[15],
-                'mean_leve_dist_2gram': batch[16],
-                'mean_cos_dist_3gram': batch[17],
-                'mean_leve_dist_3gram': batch[18],
-                'mean_cos_dist_4gram': batch[19],
-                'mean_leve_dist_4gram': batch[20],
-                'mean_cos_dist_5gram': batch[21],
-                'mean_leve_dist_5gram': batch[22],
-                'char_entity': batch[23]
+                'fuzzy_matching_ratio': batch[8],
+                'fuzzy_matching_partial_ratio': batch[9],
+                'fuzzy_matching_token_sort_ratio': batch[10],
+                'fuzzy_matching_token_set_ratio': batch[11],
+                'word_match_share': batch[12],
+                'f1_score': batch[13],
+                'mean_cos_dist_2gram': batch[14],
+                'mean_leve_dist_2gram': batch[15],
+                'mean_cos_dist_3gram': batch[16],
+                'mean_leve_dist_3gram': batch[17],
+                'mean_cos_dist_4gram': batch[18],
+                'mean_leve_dist_4gram': batch[19],
+                'mean_cos_dist_5gram': batch[20],
+                'mean_leve_dist_5gram': batch[21],
+                'char_entity': batch[22]
             }
 
-            example_indices = batch[24]
+            example_indices = batch[23]
             outputs = model(**inputs)
 
         for i, example_index in enumerate(example_indices):
@@ -431,7 +429,6 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
     char_pos = torch.tensor([f['char_pos'] for f in features], dtype=torch.long)
     char_kw = torch.tensor([f['char_kw'] for f in features], dtype=torch.long)
     char_in_que = torch.tensor([f['char_in_que'] for f in features], dtype=torch.long)
-    longest_match_ratio = torch.tensor([f['longest_match_ratio'] for f in features], dtype=torch.float)
     fuzzy_matching_ratio = torch.tensor([f['fuzzy_matching_ratio'] for f in features], dtype=torch.float)
     fuzzy_matching_partial_ratio = torch.tensor([f['fuzzy_matching_partial_ratio'] for f in features], dtype=torch.float)
     fuzzy_matching_token_sort_ratio = torch.tensor([f['fuzzy_matching_token_sort_ratio'] for f in features], dtype=torch.float)
@@ -456,7 +453,6 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
                                 char_pos,
                                 char_kw,
                                 char_in_que,
-                                longest_match_ratio,
                                 fuzzy_matching_ratio,
                                 fuzzy_matching_partial_ratio,
                                 fuzzy_matching_token_sort_ratio,
@@ -483,7 +479,6 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
                                 char_pos,
                                 char_kw,
                                 char_in_que,
-                                longest_match_ratio,
                                 fuzzy_matching_ratio,
                                 fuzzy_matching_partial_ratio,
                                 fuzzy_matching_token_sort_ratio,

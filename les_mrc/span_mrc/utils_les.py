@@ -68,7 +68,6 @@ class SquadExample(object):
                  char_pos=None,
                  char_kw=None,
                  char_in_que=None,
-                 longest_match_ratio=None,
                  fuzzy_matching_ratio=None,
                  fuzzy_matching_partial_ratio=None,
                  fuzzy_matching_token_sort_ratio=None,
@@ -100,7 +99,6 @@ class SquadExample(object):
         self.char_pos = char_pos
         self.char_kw = char_kw
         self.char_in_que = char_in_que
-        self.longest_match_ratio = longest_match_ratio
         self.fuzzy_matching_ratio = fuzzy_matching_ratio
         self.fuzzy_matching_partial_ratio = fuzzy_matching_partial_ratio
         self.fuzzy_matching_token_sort_ratio = fuzzy_matching_token_sort_ratio
@@ -202,7 +200,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                 char_pos = doc['char_pos']
                 char_kw = doc['char_kw']
                 char_in_que = doc['char_in_que']
-                longest_match_ratio = doc['longest_match_ratio']
                 fuzzy_matching_ratio = doc['fuzzy_matching_ratio']
                 fuzzy_matching_partial_ratio = doc['fuzzy_matching_partial_ratio']
                 fuzzy_matching_token_sort_ratio = doc['fuzzy_matching_token_sort_ratio']
@@ -257,7 +254,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                                 char_pos=char_pos,
                                 char_kw=char_kw,
                                 char_in_que=char_in_que,
-                                longest_match_ratio=longest_match_ratio,
                                 fuzzy_matching_ratio=fuzzy_matching_ratio,
                                 fuzzy_matching_partial_ratio=fuzzy_matching_partial_ratio,
                                 fuzzy_matching_token_sort_ratio=fuzzy_matching_token_sort_ratio,
@@ -297,7 +293,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                             char_pos=char_pos,
                             char_kw=char_kw,
                             char_in_que=char_in_que,
-                            longest_match_ratio=longest_match_ratio,
                             fuzzy_matching_ratio=fuzzy_matching_ratio,
                             fuzzy_matching_partial_ratio=fuzzy_matching_partial_ratio,
                             fuzzy_matching_token_sort_ratio=fuzzy_matching_token_sort_ratio,
@@ -337,7 +332,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                         char_pos=char_pos,
                         char_kw=char_kw,
                         char_in_que=char_in_que,
-                        longest_match_ratio=longest_match_ratio,
                         fuzzy_matching_ratio=fuzzy_matching_ratio,
                         fuzzy_matching_partial_ratio=fuzzy_matching_partial_ratio,
                         fuzzy_matching_token_sort_ratio=fuzzy_matching_token_sort_ratio,
@@ -491,7 +485,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
         char_pos_flat = get_flat_feat(example.char_pos)
         char_kw_flat = get_flat_feat(example.char_kw)
         char_in_que_flat = get_flat_feat(example.char_in_que)
-        longest_match_ratio_flat = get_flat_feat(example.longest_match_ratio)
         fuzzy_matching_ratio_flat = get_flat_feat(example.fuzzy_matching_ratio)
         fuzzy_matching_partial_ratio_flat = get_flat_feat(example.fuzzy_matching_partial_ratio)
         fuzzy_matching_token_sort_ratio_flat = get_flat_feat(example.fuzzy_matching_token_sort_ratio)
@@ -518,7 +511,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             char_pos = []
             char_kw = []
             char_in_que = []
-            longest_match_ratio = []
             fuzzy_matching_ratio = []
             fuzzy_matching_partial_ratio = []
             fuzzy_matching_token_sort_ratio = []
@@ -549,7 +541,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 char_pos.append(POS2ID['blank'])
                 char_kw.append(0)
                 char_in_que.append(0)
-                longest_match_ratio.append(0.0)
                 fuzzy_matching_ratio.append(0.0)
                 fuzzy_matching_partial_ratio.append(0.0)
                 fuzzy_matching_token_sort_ratio.append(0.0)
@@ -583,7 +574,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 p_mask.append(1)
 
                 char_in_que.append(0)
-                longest_match_ratio.append(0.0)
                 fuzzy_matching_ratio.append(0.0)
                 fuzzy_matching_partial_ratio.append(0.0)
                 fuzzy_matching_token_sort_ratio.append(0.0)
@@ -607,7 +597,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             char_pos.append(POS2ID['blank'])
             char_kw.append(0)
             char_in_que.append(0)
-            longest_match_ratio.append(0.0)
             fuzzy_matching_ratio.append(0.0)
             fuzzy_matching_partial_ratio.append(0.0)
             fuzzy_matching_token_sort_ratio.append(0.0)
@@ -639,7 +628,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 char_pos.append(char_pos_flat[split_token_index])
                 char_kw.append(char_kw_flat[split_token_index])
                 char_in_que.append(char_in_que_flat[split_token_index])
-                longest_match_ratio.append(longest_match_ratio_flat[split_token_index])
                 fuzzy_matching_ratio.append(fuzzy_matching_ratio_flat[split_token_index])
                 fuzzy_matching_partial_ratio.append(fuzzy_matching_partial_ratio_flat[split_token_index])
                 fuzzy_matching_token_sort_ratio.append(fuzzy_matching_token_sort_ratio_flat[split_token_index])
@@ -665,7 +653,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             char_pos.append(POS2ID['blank'])
             char_kw.append(0)
             char_in_que.append(0)
-            longest_match_ratio.append(0.0)
             fuzzy_matching_ratio.append(0.0)
             fuzzy_matching_partial_ratio.append(0.0)
             fuzzy_matching_token_sort_ratio.append(0.0)
@@ -705,7 +692,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 char_pos.append(POS2ID['blank'])
                 char_kw.append(0)
                 char_in_que.append(0)
-                longest_match_ratio.append(0.0)
                 fuzzy_matching_ratio.append(0.0)
                 fuzzy_matching_partial_ratio.append(0.0)
                 fuzzy_matching_token_sort_ratio.append(0.0)
@@ -729,7 +715,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             assert len(char_pos) == max_seq_length
             assert len(char_kw) == max_seq_length
             assert len(char_in_que) == max_seq_length
-            assert len(longest_match_ratio) == max_seq_length
             assert len(fuzzy_matching_ratio) == max_seq_length
             assert len(fuzzy_matching_partial_ratio) == max_seq_length
             assert len(fuzzy_matching_token_sort_ratio) == max_seq_length
@@ -821,7 +806,6 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 'char_pos': char_pos,
                 'char_kw': char_kw,
                 'char_in_que': char_in_que,
-                'longest_match_ratio': longest_match_ratio,
                 'fuzzy_matching_ratio': fuzzy_matching_ratio,
                 'fuzzy_matching_partial_ratio': fuzzy_matching_partial_ratio,
                 'fuzzy_matching_token_sort_ratio': fuzzy_matching_token_sort_ratio,
