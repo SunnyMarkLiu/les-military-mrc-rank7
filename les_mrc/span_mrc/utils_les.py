@@ -23,9 +23,9 @@ import logging
 import math
 import collections
 from io import open
-import compress_pickle
 
 from pytorch_transformers.tokenization_bert import BasicTokenizer
+from question_type import LesQuestionTypeHandler
 
 # Required by XLNet evaluation method to compute optimal threshold (see write_predictions_extended() method)
 # from utils_les_evaluate import find_all_best_thresh_v2, make_qid_to_has_ans, get_raw_scores
@@ -45,6 +45,9 @@ POS2ID = {'blank': 0, 'nrt': 1, 'eng': 2, 'n': 3, 'f': 4, 'yg': 5, 'nt': 6, 'rr'
           'mg': 27, 's': 28, 'other': 29}
 NER_DIM = 7
 NER2ID = {'': 0, 'C': 1, 'J': 2, 'L': 3, 'O': 4, 'P': 5, 'T': 6}
+
+# 问题分类
+QUES_TYPE_DIM = 8
 
 
 class SquadExample(object):
@@ -82,7 +85,8 @@ class SquadExample(object):
                  mean_leve_dist_4gram=None,
                  mean_cos_dist_5gram=None,
                  mean_leve_dist_5gram=None,
-                 char_entity=None):
+                 char_entity=None,
+                 question_type=None):
         self.qas_id = qas_id
         self.question_text = question_text
         self.doc_tokens = doc_tokens
@@ -114,6 +118,7 @@ class SquadExample(object):
         self.mean_cos_dist_5gram = mean_cos_dist_5gram
         self.mean_leve_dist_5gram = mean_leve_dist_5gram
         self.char_entity = char_entity
+        self.question_type = question_type
 
     def __str__(self):
         return self.__repr__()
@@ -141,6 +146,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
             return True
         return False
 
+    ques_type_handler = LesQuestionTypeHandler()
+
     # examples = []
     with open(input_file) as fin:
         log_steps = 5000  # log打印间隔
@@ -157,6 +164,9 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
             question_text = sample['question']
             context_num = len(sample['documents'])  # 莱斯杯固定都是5个
             context_list = [doc['content'] for doc in sample['documents']]
+
+            # 问题分类
+            question_type = ques_type_handler.get_classify_label(question_text)[0]
 
             # 处理question特征
             ques_char_pos = sample['ques_char_pos']
@@ -267,7 +277,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                                 mean_leve_dist_4gram=mean_leve_dist_4gram,
                                 mean_cos_dist_5gram=mean_cos_dist_5gram,
                                 mean_leve_dist_5gram=mean_leve_dist_5gram,
-                                char_entity=char_entity)
+                                char_entity=char_entity,
+                                question_type=question_type)
                             # examples.append(example)
                             yield example
                     else:
@@ -307,7 +318,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                             mean_leve_dist_4gram=mean_leve_dist_4gram,
                             mean_cos_dist_5gram=mean_cos_dist_5gram,
                             mean_leve_dist_5gram=mean_leve_dist_5gram,
-                            char_entity=char_entity)
+                            char_entity=char_entity,
+                            question_type=question_type)
                         # examples.append(example)
                         yield example
                 else:
@@ -347,7 +359,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                         mean_leve_dist_4gram=mean_leve_dist_4gram,
                         mean_cos_dist_5gram=mean_cos_dist_5gram,
                         mean_leve_dist_5gram=mean_leve_dist_5gram,
-                        char_entity=char_entity)
+                        char_entity=char_entity,
+                        question_type=question_type)
                     # examples.append(example)
                     yield example
 
@@ -405,6 +418,18 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
         '[SKIPPED]': '[UNK]'  # 保持长度一致
     }
 
+    # 问题分类的映射
+    ques_type_dict = {
+        0: '[unused10]',
+        1: '[unused11]',
+        2: '[unused12]',
+        3: '[unused13]',
+        4: '[unused14]',
+        5: '[unused15]',
+        6: '[unused16]',
+        7: '[unused17]',
+    }
+
     features = []
     unk_tokens_dict = collections.defaultdict(int)  # 记录vocab中找不到的token
     skipped_tokens_dict = collections.defaultdict(int)  # 记录tokenize后被删掉的token
@@ -433,6 +458,9 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
 
         if len(query_tokens) > max_query_length:
             query_tokens = query_tokens[0:max_query_length]
+
+        # question type token
+        ques_type_token = ques_type_dict[example.question_type]
 
         tok_to_orig_index = []
         orig_to_tok_index = []
@@ -475,7 +503,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             #     all_doc_tokens, tok_start_position, tok_end_position, tokenizer,
             #     example.orig_answer_text)
 
-        # The -3 accounts for [CLS], [SEP] and [SEP]
+        # The -3 accounts for [CLS], [SEP] and [SEP], 1 means question_type_token
         max_tokens_for_doc = max_seq_length - len(query_tokens) - 3
 
         # We can have documents that are longer than the maximum sequence length.
@@ -618,9 +646,33 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             segment_ids.append((sequence_a_segment_id, len(query_tokens)))
             p_mask.append((1, len(query_tokens)))
 
+            # 在问题后放置ques_type_token
+            # tokens.append(ques_type_token)
+            # segment_ids.append((sequence_a_segment_id, 1))
+            # p_mask.append((1, 1))
+            #
+            # char_pos.append((POS2ID['blank'], 1))
+            # char_kw.append((0, 1))
+            # char_in_que.append((0, 1))
+            # char_entity.append((NER2ID[''], 1))
+            # fuzzy_matching_ratio.append((0, 1))
+            # fuzzy_matching_partial_ratio.append((0, 1))
+            # fuzzy_matching_token_sort_ratio.append((0, 1))
+            # fuzzy_matching_token_set_ratio.append((0, 1))
+            # word_match_share.append((0, 1))
+            # f1_score.append((0, 1))
+            # mean_cos_dist_2gram.append((0, 1))
+            # mean_leve_dist_2gram.append((1, 1))
+            # mean_cos_dist_3gram.append((0, 1))
+            # mean_leve_dist_3gram.append((1, 1))
+            # mean_cos_dist_4gram.append((0, 1))
+            # mean_leve_dist_4gram.append((1, 1))
+            # mean_cos_dist_5gram.append((0, 1))
+            # mean_leve_dist_5gram.append((1, 1))
+
             # SEP token
             tokens.append(sep_token)
-            segment_ids.append((sequence_b_segment_id, 1))
+            segment_ids.append((sequence_a_segment_id, 1))
             p_mask.append((1, 1))
 
             char_pos.append((POS2ID['blank'], 1))
