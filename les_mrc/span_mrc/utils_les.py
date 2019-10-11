@@ -141,7 +141,7 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
             return True
         return False
 
-    examples = []
+    # examples = []
     with open(input_file) as fin:
         log_steps = 5000  # log打印间隔
         for line_id, line in enumerate(fin):
@@ -222,7 +222,6 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                 for item_ in char_entity:
                     item_[0] = NER2ID[item_[0]]
 
-
                 if is_training:
                     if doc_id in match_doc_ids:  # 该document有答案
                         count = 0  # 代表同一个document有多少个答案
@@ -269,7 +268,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                                 mean_cos_dist_5gram=mean_cos_dist_5gram,
                                 mean_leve_dist_5gram=mean_leve_dist_5gram,
                                 char_entity=char_entity)
-                            examples.append(example)
+                            # examples.append(example)
+                            yield example
                     else:
                         # 训练集中没有答案的document
                         qas_id = '{}##{}##0'.format(sample['question_id'], doc_id)
@@ -308,7 +308,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                             mean_cos_dist_5gram=mean_cos_dist_5gram,
                             mean_leve_dist_5gram=mean_leve_dist_5gram,
                             char_entity=char_entity)
-                        examples.append(example)
+                        # examples.append(example)
+                        yield example
                 else:
                     # not training
                     qas_id = '{}##{}##0'.format(sample['question_id'], doc_id)
@@ -347,11 +348,8 @@ def read_squad_examples(task_name, input_file, is_training, version_2_with_negat
                         mean_cos_dist_5gram=mean_cos_dist_5gram,
                         mean_leve_dist_5gram=mean_leve_dist_5gram,
                         char_entity=char_entity)
-                    examples.append(example)
-
-                # TODO：此处调用 convert_examples_to_features 的代码，实现合并，减少读取所有 examples 所占用的内存！！
-                # 同时转换的 features 多于一定数目如10000进行 compress_pickle 压缩处理，load cache 的时候训练读取pickle
-    return examples
+                    # examples.append(example)
+                    yield example
 
 
 # 特征展开
@@ -411,7 +409,7 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
     unk_tokens_dict = collections.defaultdict(int)  # 记录vocab中找不到的token
     skipped_tokens_dict = collections.defaultdict(int)  # 记录tokenize后被删掉的token
     log_steps = 5000  # log打印间隔
-    logger.info('total examples: {}'.format(len(examples)))
+    # logger.info('total examples: {}'.format(len(examples)))
     for (example_index, example) in enumerate(examples):
         if log_steps > 0 and (example_index + 1) % log_steps == 0:
             logger.info('we have converted {} examples to features'.format(example_index + 1))
@@ -650,8 +648,8 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
                 token_to_orig_map[len(tokens)] = tok_to_orig_index[split_token_index]
                 is_max_context = _check_is_max_context(doc_spans, doc_span_index, split_token_index)
                 token_is_max_context[len(tokens)] = is_max_context
+                tokens.append(all_doc_tokens[split_token_index])
 
-            tokens += all_doc_tokens[doc_span.start: doc_span.start + doc_span.length]
             segment_ids.append((sequence_b_segment_id, doc_span.length))
             p_mask.append((0, doc_span.length))
 
@@ -794,6 +792,12 @@ def convert_examples_to_features(args, examples, tokenizer, max_seq_length,
             assert sum([i[1] for i in mean_cos_dist_5gram]) == max_seq_length
             assert sum([i[1] for i in mean_leve_dist_5gram]) == max_seq_length
             assert sum([i[1] for i in char_entity]) == max_seq_length
+
+            # 除去一些无用的、占用空间大的字段节约空间
+            if is_training:
+                tokens = []
+                token_to_orig_map = {}
+                token_is_max_context = {}
 
             feature = {
                 'unique_id': unique_id,

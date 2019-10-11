@@ -56,8 +56,6 @@ class LazyLoadTensorDataset(Dataset):
         mean_cos_dist_5gram = torch.tensor(flat_feature_list(feature['mean_cos_dist_5gram']), dtype=torch.float)
         mean_leve_dist_5gram = torch.tensor(flat_feature_list(feature['mean_leve_dist_5gram']), dtype=torch.float)
 
-        example_index = torch.tensor(feature['example_index'], dtype=torch.long)
-
         tensors = [input_ids, input_mask, segment_ids,
                 p_mask,
                 doc_position,
@@ -87,6 +85,7 @@ class LazyLoadTensorDataset(Dataset):
             tensors.append(start_positions)
             tensors.append(end_positions)
         else:
+            example_index = torch.tensor(index, dtype=torch.long)
             tensors.append(example_index)
 
         return tensors
