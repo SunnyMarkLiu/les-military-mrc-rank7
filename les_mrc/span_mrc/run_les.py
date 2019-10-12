@@ -53,7 +53,7 @@ import compress_pickle
 from utils_les_evaluate import evaluate_on_les_answer, evaluate_on_les_bridge_entity
 from utils_les import ANSWER_MRC, BRIDGE_ENTITY_MRC
 
-from les_modeling import BertForLes, BertConcatTransformer, BertConcatBiGRU, BertSupportParaAnswerVerify, BertForLesWithFeatures
+from les_modeling import BertForLes, BertConcatBiGRU, BertForLesWithFeatures
 from les_dataset import LazyLoadTensorDataset
 
 logger = logging.getLogger(__name__)

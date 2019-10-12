@@ -54,8 +54,7 @@ def split_features(doc, window_start_idx, window_end_idx):
     assert sum([l[1] for l in doc['char_entity']]) == doc_len
 
     # 特征截断
-    for f in ['levenshtein_dist', 'longest_match_size', 'longest_match_ratio', 'compression_dist', 'jaccard_coef',
-              'dice_dist', 'countbased_cos_distance', 'fuzzy_matching_ratio', 'fuzzy_matching_partial_ratio',
+    for f in ['fuzzy_matching_ratio', 'fuzzy_matching_partial_ratio',
               'fuzzy_matching_token_sort_ratio', 'fuzzy_matching_token_set_ratio', 'word_match_share', 'f1_score',
               'mean_cos_dist_2gram', 'mean_leve_dist_2gram', 'mean_cos_dist_3gram', 'mean_leve_dist_3gram',
               'mean_cos_dist_4gram', 'mean_leve_dist_4gram', 'mean_cos_dist_5gram', 'mean_leve_dist_5gram']:
