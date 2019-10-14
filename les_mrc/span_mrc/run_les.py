@@ -631,12 +631,6 @@ def main():
     elif args.customer_model_class.lower() == 'BertConcatBiGRU'.lower():
         model_class = BertConcatBiGRU
         logger.warning('We load customer model `{}`, rather than normal bert model'.format(model_class.__name__))
-    elif args.customer_model_class.lower() == 'BertConcatTransformer'.lower():
-        model_class = BertConcatTransformer
-        logger.warning('We load customer model `{}`, rather than normal bert model'.format(model_class.__name__))
-    elif args.customer_model_class.lower() == 'BertSupportParaAnswerVerify'.lower():
-        model_class = BertSupportParaAnswerVerify
-        logger.warning('We load customer model `{}`, rather than normal bert model'.format(model_class.__name__))
     else:
         raise NotImplementedError('We have not implemented the {} model class'.format(args.customer_model_class))
 

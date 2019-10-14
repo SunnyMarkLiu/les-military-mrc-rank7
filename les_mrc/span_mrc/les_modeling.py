@@ -135,7 +135,8 @@ class BertForLesWithFeatures(BertPreTrainedModel):
         self.bert = BertModel(config)
 
         # 添加特征后的维度
-        self.hidden_size = config.hidden_size + 14 + POS_DIM + NER_DIM + 2 + 2
+        # self.hidden_size = config.hidden_size + 14 + POS_DIM + NER_DIM + 2 + 2
+        self.hidden_size = config.hidden_size + POS_DIM + NER_DIM + 2 + 2
 
         self.qa_outputs = nn.Linear(self.hidden_size, config.num_labels)
 
@@ -174,22 +175,23 @@ class BertForLesWithFeatures(BertPreTrainedModel):
         char_kw = F.one_hot(char_kw, num_classes=2).float()
         char_in_que = F.one_hot(char_in_que, num_classes=2).float()
         # 拼接所有特征
-        features = torch.stack([
-                                fuzzy_matching_ratio,
-                                fuzzy_matching_partial_ratio,
-                                fuzzy_matching_token_sort_ratio,
-                                fuzzy_matching_token_set_ratio,
-                                word_match_share,
-                                f1_score,
-                                mean_cos_dist_2gram,
-                                mean_leve_dist_2gram,
-                                mean_cos_dist_3gram,
-                                mean_leve_dist_3gram,
-                                mean_cos_dist_4gram,
-                                mean_leve_dist_4gram,
-                                mean_cos_dist_5gram,
-                                mean_leve_dist_5gram], dim=2)
-        features = torch.cat([char_pos, char_entity, char_kw, char_in_que, features], dim=-1)
+        # features = torch.stack([
+        #                         fuzzy_matching_ratio,
+        #                         fuzzy_matching_partial_ratio,
+        #                         fuzzy_matching_token_sort_ratio,
+        #                         fuzzy_matching_token_set_ratio,
+        #                         word_match_share,
+        #                         f1_score,
+        #                         mean_cos_dist_2gram,
+        #                         mean_leve_dist_2gram,
+        #                         mean_cos_dist_3gram,
+        #                         mean_leve_dist_3gram,
+        #                         mean_cos_dist_4gram,
+        #                         mean_leve_dist_4gram,
+        #                         mean_cos_dist_5gram,
+        #                         mean_leve_dist_5gram], dim=2)
+        # features = torch.cat([char_pos, char_entity, char_kw, char_in_que, features], dim=-1)
+        features = torch.cat([char_pos, char_entity, char_kw, char_in_que], dim=-1)
 
         sequence_output = torch.cat([sequence_output, features], dim=-1)
 

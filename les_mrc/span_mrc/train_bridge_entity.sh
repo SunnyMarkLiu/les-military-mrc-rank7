@@ -1,15 +1,15 @@
 #!/bin/bash
 set -ex
-DATA_DIR="/home/lq/projects/Research/Reading-Comprehension/les-military-mrc/input/bridge_entity_mrc_dataset"
-MODEL_DIR="/home/lq/projects/deep_learning/yingzq/pretrained_weights/chinese_wwm_pytorch"
-MODEL_COMMENT="bridge_entity_mrc_wwm_BertForLes"
+DATA_DIR="/home/lq/projects/deep_learning/yingzq/les-military-mrc_1012/input"
+MODEL_DIR="/home/lq/projects/deep_learning/pretrained_weights/chinese_wwm_pytorch"
+MODEL_COMMENT="bridge_entity_mrc_wwm_BertForLes_ner-kw-pos-wiq_bs32"
 
 python run_les.py \
-    --cuda_devices 0,1,3 \
+    --cuda_devices 2,3 \
     --task_name bridge_entity_mrc \
     --comment ${MODEL_COMMENT} \
     --model_type bert \
-    --customer_model_class BertForLes \
+    --customer_model_class BertForLesWithFeatures \
     --model_name_or_path ${MODEL_DIR}/pytorch_model.bin \
     --config_name ${MODEL_DIR}/bert_config.json \
     --tokenizer_name ${MODEL_DIR}/vocab.txt \
@@ -18,7 +18,7 @@ python run_les.py \
     --evaluate_during_training \
     --do_lower_case \
     --with_back_trans \
-    --train_file ${DATA_DIR}/train_max_content_len_1000.json \
+    --train_file ${DATA_DIR}/bridge_entity_mrc_dataset/train_max_content_len_1024.json \
     --predict_file ${DATA_DIR}/dev.json \
     --output_dir bridge_entity_models/${MODEL_COMMENT} \
     --version_2_with_negative \
@@ -31,10 +31,10 @@ python run_les.py \
     --learning_rate 3e-5 \
     --warmup_steps 5200 \
     --warmup_proportion 0.1 \
-    --num_train_epochs 2 \
-    --gradient_accumulation_steps 1 \
-    --doc_stride 128 \
+    --num_train_epochs 6 \
+    --gradient_accumulation_steps 2 \
+    --doc_stride 400 \
     --logging_steps 200 \
     --save_steps 8000 \
-    --eval_steps 4000 \
+    --eval_steps 8000 \
     --null_score_diff_threshold 10 \

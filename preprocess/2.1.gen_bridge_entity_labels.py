@@ -182,8 +182,12 @@ def gen_bridging_entity_mrc_dataset(sample):
         bridging_entity_labels = (best_sup_doc_i - 1, start_label, end_label)
 
     sample['bridging_entity_labels'] = bridging_entity_labels
-    sample['fake_bridging_entity'] = sample['documents'][bridging_entity_labels[0]]['content'] \
-                                            [bridging_entity_labels[1]: bridging_entity_labels[2] + 1]
+
+    if not bridging_entity_labels:
+        sample['fake_bridging_entity'] = ''
+    else:
+        sample['fake_bridging_entity'] = sample['documents'][bridging_entity_labels[0]]['content'] \
+                                                [bridging_entity_labels[1]: bridging_entity_labels[2] + 1]
 
     if sample['fake_bridging_entity'] == '':
         sample['ceil_rougel'] = 0
