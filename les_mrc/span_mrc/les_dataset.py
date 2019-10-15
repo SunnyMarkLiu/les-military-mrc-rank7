@@ -41,47 +41,18 @@ class LazyLoadTensorDataset(Dataset):
         char_kw = torch.tensor(flat_feature_list(feature['char_kw']), dtype=torch.long)
         char_in_que = torch.tensor(flat_feature_list(feature['char_in_que']), dtype=torch.long)
         char_entity = torch.tensor(flat_feature_list(feature['char_entity']), dtype=torch.long)
-        fuzzy_matching_ratio = torch.tensor(flat_feature_list(feature['fuzzy_matching_ratio']), dtype=torch.float)
-        fuzzy_matching_partial_ratio = torch.tensor(flat_feature_list(feature['fuzzy_matching_partial_ratio']), dtype=torch.float)
-        fuzzy_matching_token_sort_ratio = torch.tensor(flat_feature_list(feature['fuzzy_matching_token_sort_ratio']), dtype=torch.float)
-        fuzzy_matching_token_set_ratio = torch.tensor(flat_feature_list(feature['fuzzy_matching_token_set_ratio']), dtype=torch.float)
-        word_match_share = torch.tensor(flat_feature_list(feature['word_match_share']), dtype=torch.float)
-        f1_score = torch.tensor(flat_feature_list(feature['f1_score']), dtype=torch.float)
-        mean_cos_dist_2gram = torch.tensor(flat_feature_list(feature['mean_cos_dist_2gram']), dtype=torch.float)
-        mean_leve_dist_2gram = torch.tensor(flat_feature_list(feature['mean_leve_dist_2gram']), dtype=torch.float)
-        mean_cos_dist_3gram = torch.tensor(flat_feature_list(feature['mean_cos_dist_3gram']), dtype=torch.float)
-        mean_leve_dist_3gram = torch.tensor(flat_feature_list(feature['mean_leve_dist_3gram']), dtype=torch.float)
-        mean_cos_dist_4gram = torch.tensor(flat_feature_list(feature['mean_cos_dist_4gram']), dtype=torch.float)
-        mean_leve_dist_4gram = torch.tensor(flat_feature_list(feature['mean_leve_dist_4gram']), dtype=torch.float)
-        mean_cos_dist_5gram = torch.tensor(flat_feature_list(feature['mean_cos_dist_5gram']), dtype=torch.float)
-        mean_leve_dist_5gram = torch.tensor(flat_feature_list(feature['mean_leve_dist_5gram']), dtype=torch.float)
 
         tensors = [input_ids, input_mask, segment_ids,
-                p_mask,
-                doc_position,
-                char_pos,
-                char_kw,
-                char_in_que,
-                fuzzy_matching_ratio,
-                fuzzy_matching_partial_ratio,
-                fuzzy_matching_token_sort_ratio,
-                fuzzy_matching_token_set_ratio,
-                word_match_share,
-                f1_score,
-                mean_cos_dist_2gram,
-                mean_leve_dist_2gram,
-                mean_cos_dist_3gram,
-                mean_leve_dist_3gram,
-                mean_cos_dist_4gram,
-                mean_leve_dist_4gram,
-                mean_cos_dist_5gram,
-                mean_leve_dist_5gram,
-                char_entity]
+                   p_mask,
+                   doc_position,
+                   char_pos,
+                   char_kw,
+                   char_in_que,
+                   char_entity]
 
         if self.is_training:
             start_positions = torch.tensor(feature['start_position'], dtype=torch.long)
             end_positions = torch.tensor(feature['end_position'], dtype=torch.long)
-
             tensors.append(start_positions)
             tensors.append(end_positions)
         else:

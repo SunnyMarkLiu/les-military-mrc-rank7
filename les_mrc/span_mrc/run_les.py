@@ -153,26 +153,12 @@ def train(args, train_dataset, model, tokenizer):
                 'char_pos': batch[5],
                 'char_kw': batch[6],
                 'char_in_que': batch[7],
-                'fuzzy_matching_ratio': batch[8],
-                'fuzzy_matching_partial_ratio': batch[9],
-                'fuzzy_matching_token_sort_ratio': batch[10],
-                'fuzzy_matching_token_set_ratio': batch[11],
-                'word_match_share': batch[12],
-                'f1_score': batch[13],
-                'mean_cos_dist_2gram': batch[14],
-                'mean_leve_dist_2gram': batch[15],
-                'mean_cos_dist_3gram': batch[16],
-                'mean_leve_dist_3gram': batch[17],
-                'mean_cos_dist_4gram': batch[18],
-                'mean_leve_dist_4gram': batch[19],
-                'mean_cos_dist_5gram': batch[20],
-                'mean_leve_dist_5gram': batch[21],
-                'char_entity': batch[22]
+                'char_entity': batch[8]
             }
 
             inputs.update({
-                'start_positions': batch[23],
-                'end_positions': batch[24]
+                'start_positions': batch[9],
+                'end_positions': batch[10]
             })
 
             outputs = model(**inputs)
@@ -278,24 +264,10 @@ def evaluate(args, model, tokenizer, prefix="les"):
                 'char_pos': batch[5],
                 'char_kw': batch[6],
                 'char_in_que': batch[7],
-                'fuzzy_matching_ratio': batch[8],
-                'fuzzy_matching_partial_ratio': batch[9],
-                'fuzzy_matching_token_sort_ratio': batch[10],
-                'fuzzy_matching_token_set_ratio': batch[11],
-                'word_match_share': batch[12],
-                'f1_score': batch[13],
-                'mean_cos_dist_2gram': batch[14],
-                'mean_leve_dist_2gram': batch[15],
-                'mean_cos_dist_3gram': batch[16],
-                'mean_leve_dist_3gram': batch[17],
-                'mean_cos_dist_4gram': batch[18],
-                'mean_leve_dist_4gram': batch[19],
-                'mean_cos_dist_5gram': batch[20],
-                'mean_leve_dist_5gram': batch[21],
-                'char_entity': batch[22]
+                'char_entity': batch[8]
             }
 
-            example_indices = batch[23]
+            example_indices = batch[9]
             outputs = model(**inputs)
 
         for i, example_index in enumerate(example_indices):
@@ -364,20 +336,28 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
     else:
         data_type = 'train'
 
+    part_name = None
+    if args.file_part == -1:
+        part_name = 'all'
+    else:
+        part_name = 'part_' + str(args.file_part)
+
     if data_type == 'train':
         cached_features_file = os.path.join(os.path.dirname(input_file),
-                                            'cached_{}_seqlen{}_querylen{}_answerlen{}_docstride{}_train_neg_sample_ratio{}_back_trans_{}.pkl'.format(
+                                            'cached_{}_{}_{}_seqlen{}_querylen{}_answerlen{}_docstride{}_train_neg_sample_ratio{}.pkl'.format(
+                                            args.task_name,
                                             data_type,
+                                            part_name,
                                             args.max_seq_length,
                                             args.max_query_length,
                                             args.max_answer_length,
                                             args.doc_stride,
-                                            args.train_neg_sample_ratio,
-                                            args.with_back_trans))
+                                            args.train_neg_sample_ratio))
     else:
         cached_features_file = os.path.join(os.path.dirname(input_file),
-                                            'cached_{}_seqlen{}_querylen{}_answerlen{}_docstride{}.pkl'.format(
+                                            'cached_{}_{}_seqlen{}_querylen{}_answerlen{}_docstride{}.pkl'.format(
                                             data_type,
+                                            part_name,
                                             args.max_seq_length,
                                             args.max_query_length,
                                             args.max_answer_length,
@@ -445,6 +425,8 @@ def main():
                         help="SQuAD json for training. E.g., train-v1.1.json")
     parser.add_argument("--predict_file", default=None, type=str, required=False,
                         help="SQuAD json for predictions. E.g., dev-v1.1.json or test-v1.1.json")
+    parser.add_argument("--file_part", default=-1, type=int, required=True,
+                        help="file may be large, we can split file to some part")
     parser.add_argument("--model_type", default=None, type=str, required=True,
                         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
     parser.add_argument("--customer_model_class", default=None, type=str, required=True,
