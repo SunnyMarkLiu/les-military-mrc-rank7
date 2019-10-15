@@ -337,7 +337,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
         data_type = 'train'
 
     part_name = None
-    if args.file_part == -1:
+    if args.file_part == -1 or data_type == 'dev':
         part_name = 'all'
     else:
         part_name = 'part_' + str(args.file_part)
