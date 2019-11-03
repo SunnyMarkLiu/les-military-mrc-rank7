@@ -12,7 +12,7 @@
 为解决上述问题，本团队采用如下图所示的整体技术架构:
 
 <p align="center">
-<img src="architecture.png" width="70%">
+<img src="architecture.png" width="50%">
 </p>
 
 ## Text Preprocess
@@ -30,7 +30,10 @@
 - 以上均不满足，则以答案为基本中心(中心点存在随机性)，截取 1024长度
 
 注意，在文档长度较长且答案基本处于中间位置的情况，为避免截断过程中存在的答案位置的偏置，本方案设置了答案开始下标距离文档左边界的随机性，截断方法如下图所示:
-![](context_selection.png)
+
+<p align="center">
+<img src="context_selection.png" width="70%">
+</p>
 
 ## Features
 - 利用 [jieba](https://github.com/fxsjy/jieba) 分词工具提取问题和文档的 POS、
@@ -39,7 +42,9 @@ Keyword 特征，同时针对文档的每个字符提取是否在问题中出现
 问题和文档的命名实体，一共包含 7 类实体，并进行 one-hot 处理
 
 ## Experiment
-![](experiment.png)
+<p align="center">
+<img src="experiment.png" width="60%">
+</p>
 
 ## Teammates
 **Lucky Boys**
